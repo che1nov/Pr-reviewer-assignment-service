@@ -21,10 +21,12 @@ type App struct {
 func New(cfg config.Config, logger *slog.Logger) *App {
 	userStorage := memory.NewUserStorage()
 	createUserUC := usecases.NewCreateUserUseCase(userStorage)
+	listUsersUC := usecases.NewListUsersUseCase(userStorage)
 
 	router := httpcontroller.NewRouter(httpcontroller.RouterConfig{
 		Message:           cfg.Message,
 		CreateUserUseCase: createUserUC,
+		ListUsersUseCase:  listUsersUC,
 		Logger:            logger,
 	})
 

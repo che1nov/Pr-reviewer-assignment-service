@@ -15,6 +15,7 @@ import (
 type RouterConfig struct {
 	Message           string
 	CreateUserUseCase *usecases.CreateUserUseCase
+	ListUsersUseCase  *usecases.ListUsersUseCase
 	Logger            *slog.Logger
 }
 
@@ -35,6 +36,33 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(cfg.Message))
 	})
+
+	if cfg.ListUsersUseCase != nil {
+		r.Get("/users", func(w http.ResponseWriter, r *http.Request) {
+			users, err := cfg.ListUsersUseCase.Execute(r.Context())
+			if err != nil {
+				cfg.Logger.Error("failed to list users", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			response := dto.UsersOutput{
+				Users: make([]dto.UserOutput, 0, len(users)),
+			}
+			for _, user := range users {
+				response.Users = append(response.Users, dto.UserOutput{
+					ID:   user.ID,
+					Name: user.Name,
+				})
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				cfg.Logger.Error("failed to encode users", "error", err)
+			}
+		})
+	}
 
 	if cfg.CreateUserUseCase != nil {
 		r.Post("/users", func(w http.ResponseWriter, r *http.Request) {
