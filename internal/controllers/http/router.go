@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/dto"
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/usecases"
 )
@@ -16,6 +17,8 @@ type RouterConfig struct {
 	Message           string
 	CreateUserUseCase *usecases.CreateUserUseCase
 	ListUsersUseCase  *usecases.ListUsersUseCase
+	CreateTeamUseCase *usecases.CreateTeamUseCase
+	ListTeamsUseCase  *usecases.ListTeamsUseCase
 	Logger            *slog.Logger
 }
 
@@ -87,6 +90,64 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(dto.UserOutput{ID: input.ID, Name: input.Name})
+		})
+	}
+
+	if cfg.ListTeamsUseCase != nil {
+		r.Get("/teams", func(w http.ResponseWriter, r *http.Request) {
+			teams, err := cfg.ListTeamsUseCase.Execute(r.Context())
+			if err != nil {
+				cfg.Logger.Error("failed to list teams", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			response := make([]dto.TeamOutput, 0, len(teams))
+			for _, team := range teams {
+				users := make([]dto.UserOutput, 0, len(team.Users))
+				for _, user := range team.Users {
+					users = append(users, dto.UserOutput{ID: user.ID, Name: user.Name})
+				}
+				response = append(response, dto.TeamOutput{
+					Name:  team.Name,
+					Users: users,
+				})
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				cfg.Logger.Error("failed to encode teams", "error", err)
+			}
+		})
+	}
+
+	if cfg.CreateTeamUseCase != nil {
+		r.Post("/teams", func(w http.ResponseWriter, r *http.Request) {
+			var input dto.TeamInput
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				cfg.Logger.Error("failed to decode team", "error", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			users := make([]domain.User, 0, len(input.Users))
+			for _, u := range input.Users {
+				if u.ID == "" || u.Name == "" {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				users = append(users, domain.User{ID: u.ID, Name: u.Name})
+			}
+
+			team := domain.NewTeam(input.Name, users)
+			if err := cfg.CreateTeamUseCase.Execute(r.Context(), team); err != nil {
+				cfg.Logger.Error("failed to create team", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusCreated)
 		})
 	}
 

@@ -10,3 +10,8 @@ type UserStorage interface {
 	CreateUser(ctx context.Context, id, name string) error
 	ListUsers(ctx context.Context) ([]domain.User, error)
 }
+
+type TeamStorage interface {
+	CreateTeam(ctx context.Context, team domain.Team) error
+	ListTeams(ctx context.Context) ([]domain.Team, error)
+}

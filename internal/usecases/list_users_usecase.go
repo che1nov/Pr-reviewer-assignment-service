@@ -6,7 +6,6 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 )
 
-// ListUsersUseCase возвращает всех пользователей из хранилища
 type ListUsersUseCase struct {
 	storage UserStorage
 }
