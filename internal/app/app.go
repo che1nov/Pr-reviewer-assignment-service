@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -20,17 +21,19 @@ type App struct {
 
 func New(cfg config.Config, logger *slog.Logger) *App {
 	userStorage := memory.NewUserStorage()
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
 	createUserUC := usecases.NewCreateUserUseCase(userStorage)
 	listUsersUC := usecases.NewListUsersUseCase(userStorage)
 	setUserActiveUC := usecases.NewSetUserActiveUseCase(userStorage)
 	createTeamUC := usecases.NewCreateTeamUseCase(userStorage, userStorage)
 	listTeamsUC := usecases.NewListTeamsUseCase(userStorage)
-	createPRUC := usecases.NewCreatePullRequestUseCase(userStorage, userStorage)
+	createPRUC := usecases.NewCreatePullRequestUseCase(userStorage, userStorage, rng)
 	listPRsUC := usecases.NewListPullRequestsUseCase(userStorage)
 	getReviewerPRsUC := usecases.NewGetReviewerPullRequestsUseCase(userStorage)
 	mergePRUC := usecases.NewMergePullRequestUseCase(userStorage)
 	assignReviewerUC := usecases.NewAssignReviewerUseCase(userStorage, userStorage, userStorage)
-	reassignReviewerUC := usecases.NewReassignReviewerUseCase(userStorage, userStorage, userStorage)
+	reassignReviewerUC := usecases.NewReassignReviewerUseCase(userStorage, userStorage, userStorage, rng)
 
 	router := httpcontroller.NewRouter(httpcontroller.RouterConfig{
 		Message:                  cfg.Message,

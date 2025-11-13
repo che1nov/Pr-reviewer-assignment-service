@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"math/rand"
 
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 )
@@ -10,17 +11,20 @@ type ReassignReviewerUseCase struct {
 	prStorage   PullRequestStorage
 	teamStorage TeamStorage
 	userStorage UserStorage
+	rand        *rand.Rand
 }
 
 func NewReassignReviewerUseCase(
 	prStorage PullRequestStorage,
 	teamStorage TeamStorage,
 	userStorage UserStorage,
+	rng *rand.Rand,
 ) *ReassignReviewerUseCase {
 	return &ReassignReviewerUseCase{
 		prStorage:   prStorage,
 		teamStorage: teamStorage,
 		userStorage: userStorage,
+		rand:        rng,
 	}
 }
 
@@ -35,24 +39,48 @@ func (uc *ReassignReviewerUseCase) Execute(ctx context.Context, prID, oldReviewe
 		return domain.PullRequest{}, err
 	}
 
-	if oldReviewerID == newReviewerID {
-		return domain.PullRequest{}, domain.ErrReviewerAlreadyAdded
+	candidates := make([]domain.User, 0, len(team.Users))
+	for _, member := range team.Users {
+		if member.ID == pr.AuthorID || !member.IsActive {
+			continue
+		}
+		if member.ID == oldReviewerID {
+			continue
+		}
+		alreadyAssigned := false
+		for _, assigned := range pr.Reviewers {
+			if assigned == member.ID {
+				alreadyAssigned = true
+				break
+			}
+		}
+		if alreadyAssigned {
+			continue
+		}
+		candidates = append(candidates, member)
 	}
 
-	var newMember domain.User
-	isNewMember := false
-	for _, member := range team.Users {
-		if member.ID == newReviewerID {
-			newMember = member
-			isNewMember = true
-			break
+	if newReviewerID == "" {
+		if len(candidates) == 0 {
+			return domain.PullRequest{}, domain.ErrReviewerNotInTeam
 		}
-	}
-	if !isNewMember {
-		return domain.PullRequest{}, domain.ErrReviewerNotInTeam
-	}
-	if !newMember.IsActive {
-		return domain.PullRequest{}, domain.ErrReviewerInactive
+		if uc.rand != nil && len(candidates) > 1 {
+			uc.rand.Shuffle(len(candidates), func(i, j int) {
+				candidates[i], candidates[j] = candidates[j], candidates[i]
+			})
+		}
+		newReviewerID = candidates[0].ID
+	} else {
+		valid := false
+		for _, candidate := range candidates {
+			if candidate.ID == newReviewerID {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return domain.PullRequest{}, domain.ErrReviewerNotInTeam
+		}
 	}
 
 	if err := pr.ReplaceReviewer(oldReviewerID, newReviewerID); err != nil {

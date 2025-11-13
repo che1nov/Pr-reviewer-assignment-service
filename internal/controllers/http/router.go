@@ -394,8 +394,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			}
 
 			var payload struct {
-				OldReviewerID string `json:"old_reviewer_id"`
-				NewReviewerID string `json:"new_reviewer_id"`
+				OldReviewerID string  `json:"old_reviewer_id"`
+				NewReviewerID *string `json:"new_reviewer_id,omitempty"`
 			}
 
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -404,12 +404,17 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				return
 			}
 
-			if payload.OldReviewerID == "" || payload.NewReviewerID == "" {
+			if payload.OldReviewerID == "" {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 
-			updated, err := cfg.ReassignReviewerUseCase.Execute(r.Context(), id, payload.OldReviewerID, payload.NewReviewerID)
+			newReviewerID := ""
+			if payload.NewReviewerID != nil {
+				newReviewerID = *payload.NewReviewerID
+			}
+
+			updated, err := cfg.ReassignReviewerUseCase.Execute(r.Context(), id, payload.OldReviewerID, newReviewerID)
 			if err != nil {
 				switch {
 				case errors.Is(err, domain.ErrPullRequestNotFound):
@@ -427,6 +432,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				case errors.Is(err, domain.ErrReviewerAlreadyAdded):
 					w.WriteHeader(http.StatusConflict)
 				case errors.Is(err, domain.ErrPullRequestMerged):
+					w.WriteHeader(http.StatusConflict)
+				case errors.Is(err, domain.ErrReviewerLimitReached):
 					w.WriteHeader(http.StatusConflict)
 				default:
 					cfg.Logger.Error("failed to reassign reviewer", "error", err)
