@@ -1,0 +1,4 @@
+# ignore external specification and local IDE config files
+openapi.yml
+Backend-trainee-assignment-autumn-2025.md
+.idea

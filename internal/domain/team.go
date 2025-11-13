@@ -1,15 +1,19 @@
 package domain
 
-// Team описывает команду пользователей
 type Team struct {
 	Name  string
 	Users []User
 }
 
 func NewTeam(name string, users []User) Team {
+	prepared := make([]User, 0, len(users))
+	for _, user := range users {
+		user.TeamName = name
+		prepared = append(prepared, user)
+	}
 	return Team{
 		Name:  name,
-		Users: users,
+		Users: prepared,
 	}
 }
 

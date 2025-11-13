@@ -14,486 +14,368 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/usecases"
 )
 
-// RouterConfig содержит зависимости маршрутизатора
+// RouterConfig зависимости HTTP-роутера.
 type RouterConfig struct {
-	Message                  string
-	CreateUserUseCase        *usecases.CreateUserUseCase
-	ListUsersUseCase         *usecases.ListUsersUseCase
+	Logger *slog.Logger
+
+	AdminToken string
+	UserToken  string
+
+	AddTeamUseCase           *usecases.CreateTeamUseCase
+	GetTeamUseCase           *usecases.GetTeamUseCase
 	SetUserActiveUseCase     *usecases.SetUserActiveUseCase
-	CreateTeamUseCase        *usecases.CreateTeamUseCase
-	ListTeamsUseCase         *usecases.ListTeamsUseCase
 	CreatePullRequestUseCase *usecases.CreatePullRequestUseCase
-	ListPullRequestsUseCase  *usecases.ListPullRequestsUseCase
 	MergePullRequestUseCase  *usecases.MergePullRequestUseCase
-	AssignReviewerUseCase    *usecases.AssignReviewerUseCase
 	ReassignReviewerUseCase  *usecases.ReassignReviewerUseCase
 	GetReviewerPRsUseCase    *usecases.GetReviewerPullRequestsUseCase
-	Logger                   *slog.Logger
 }
 
+// NewRouter строит HTTP маршрутизатор в соответствии с OpenAPI.
 func NewRouter(cfg RouterConfig) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(cfg.Logger, w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	r.Get("/", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(cfg.Message))
+	r.Group(func(r chi.Router) {
+		r.Use(adminAuth(cfg.Logger, cfg.AdminToken))
+
+		r.Post("/team/add", func(w http.ResponseWriter, r *http.Request) {
+			var body dto.Team
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "некорректный формат запроса", err)
+				return
+			}
+
+			if body.TeamName == "" {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "team_name обязателен", nil)
+				return
+			}
+
+			members := make([]domain.User, 0, len(body.Members))
+			for _, member := range body.Members {
+				if member.UserID == "" || member.Username == "" {
+					respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "user_id и username обязательны", nil)
+					return
+				}
+				members = append(members, domain.NewUser(member.UserID, member.Username, body.TeamName, member.IsActive))
+			}
+
+			team, err := cfg.AddTeamUseCase.Execute(r.Context(), domain.NewTeam(body.TeamName, members))
+			if err != nil {
+				status, code, message := mapTeamError(err)
+				cfg.Logger.ErrorContext(r.Context(), "ошибка создания команды", "error", err, "team_name", body.TeamName)
+				respondError(cfg.Logger, w, status, code, message)
+				return
+			}
+
+			respondJSON(cfg.Logger, w, http.StatusCreated, map[string]dto.Team{"team": toTeam(team)})
+		})
+
+		r.Post("/pullRequest/create", func(w http.ResponseWriter, r *http.Request) {
+			var body dto.CreatePullRequestRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "некорректный формат запроса", err)
+				return
+			}
+			if body.PullRequestID == "" || body.PullRequestName == "" || body.AuthorID == "" {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "pull_request_id, pull_request_name и author_id обязательны", nil)
+				return
+			}
+
+			pr, err := cfg.CreatePullRequestUseCase.Execute(r.Context(), body.PullRequestID, body.PullRequestName, body.AuthorID)
+			if err != nil {
+				status, code, message := mapPullRequestCreateError(err)
+				cfg.Logger.ErrorContext(r.Context(), "ошибка создания pull request", "error", err, "pr_id", body.PullRequestID)
+				respondError(cfg.Logger, w, status, code, message)
+				return
+			}
+
+			respondJSON(cfg.Logger, w, http.StatusCreated, map[string]dto.PullRequest{"pr": toPullRequest(pr)})
+		})
+
+		r.Post("/pullRequest/merge", func(w http.ResponseWriter, r *http.Request) {
+			var body dto.MergePullRequestRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "некорректный формат запроса", err)
+				return
+			}
+			if body.PullRequestID == "" {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "pull_request_id обязателен", nil)
+				return
+			}
+
+			pr, err := cfg.MergePullRequestUseCase.Execute(r.Context(), body.PullRequestID)
+			if err != nil {
+				status, code, message := mapMergeError(err)
+				cfg.Logger.ErrorContext(r.Context(), "ошибка при merge pull request", "error", err, "pr_id", body.PullRequestID)
+				respondError(cfg.Logger, w, status, code, message)
+				return
+			}
+
+			respondJSON(cfg.Logger, w, http.StatusOK, map[string]dto.PullRequest{"pr": toPullRequest(pr)})
+		})
+
+		r.Post("/pullRequest/reassign", func(w http.ResponseWriter, r *http.Request) {
+			var body dto.ReassignReviewerRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "некорректный формат запроса", err)
+				return
+			}
+			if body.PullRequestID == "" || body.OldReviewerID == "" {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "pull_request_id и old_user_id обязательны", nil)
+				return
+			}
+
+			pr, replacedBy, err := cfg.ReassignReviewerUseCase.Execute(r.Context(), body.PullRequestID, body.OldReviewerID, body.NewReviewerID)
+			if err != nil {
+				status, code, message := mapReassignError(err)
+				cfg.Logger.ErrorContext(r.Context(), "ошибка переназначения ревьюера", "error", err, "pr_id", body.PullRequestID, "old_reviewer", body.OldReviewerID)
+				respondError(cfg.Logger, w, status, code, message)
+				return
+			}
+
+			respondJSON(cfg.Logger, w, http.StatusOK, dto.ReassignReviewerResponse{
+				PR:         toPullRequest(pr),
+				ReplacedBy: replacedBy,
+			})
+		})
+
+		r.Post("/users/setIsActive", func(w http.ResponseWriter, r *http.Request) {
+			var body dto.SetUserActiveRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "некорректный формат запроса", err)
+				return
+			}
+			if body.UserID == "" {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "user_id обязателен", nil)
+				return
+			}
+
+			user, err := cfg.SetUserActiveUseCase.Execute(r.Context(), body.UserID, body.IsActive)
+			if err != nil {
+				status, code, message := mapUserError(err)
+				cfg.Logger.ErrorContext(r.Context(), "ошибка обновления статуса пользователя", "error", err, "user_id", body.UserID)
+				respondError(cfg.Logger, w, status, code, message)
+				return
+			}
+
+			respondJSON(cfg.Logger, w, http.StatusOK, map[string]dto.User{"user": toUser(user)})
+		})
 	})
 
-	if cfg.ListUsersUseCase != nil {
-		r.Get("/users", func(w http.ResponseWriter, r *http.Request) {
-			users, err := cfg.ListUsersUseCase.Execute(r.Context())
+	r.Group(func(r chi.Router) {
+		r.Use(userAuth(cfg.Logger, cfg.AdminToken, cfg.UserToken))
+
+		r.Get("/team/get", func(w http.ResponseWriter, r *http.Request) {
+			teamName := r.URL.Query().Get("team_name")
+			if teamName == "" {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "team_name обязателен", nil)
+				return
+			}
+
+			team, err := cfg.GetTeamUseCase.Execute(r.Context(), teamName)
 			if err != nil {
-				cfg.Logger.Error("failed to list users", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
+				cfg.Logger.WarnContext(r.Context(), "команда не найдена", "team_name", teamName, "error", err)
+				respondError(cfg.Logger, w, http.StatusNotFound, "NOT_FOUND", err.Error())
 				return
 			}
 
-			response := dto.UsersOutput{
-				Users: make([]dto.UserOutput, 0, len(users)),
-			}
-			for _, user := range users {
-				response.Users = append(response.Users, dto.UserOutput{
-					ID:       user.ID,
-					Name:     user.Name,
-					IsActive: user.IsActive,
-				})
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(response); err != nil {
-				cfg.Logger.Error("failed to encode users", "error", err)
-			}
+			respondJSON(cfg.Logger, w, http.StatusOK, toTeam(team))
 		})
-	}
 
-	if cfg.CreateUserUseCase != nil {
-		r.Post("/users", func(w http.ResponseWriter, r *http.Request) {
-			var input dto.UserInput
-			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-				cfg.Logger.Error("failed to decode user", "error", err)
-				w.WriteHeader(http.StatusBadRequest)
+		r.Get("/users/getReview", func(w http.ResponseWriter, r *http.Request) {
+			userID := r.URL.Query().Get("user_id")
+			if userID == "" {
+				respondBadRequest(cfg.Logger, r, w, "BAD_REQUEST", "user_id обязателен", nil)
 				return
 			}
 
-			if input.ID == "" || input.Name == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			isActive := true
-			if input.IsActive != nil {
-				isActive = *input.IsActive
-			}
-
-			user := domain.User{
-				ID:       input.ID,
-				Name:     input.Name,
-				IsActive: isActive,
-			}
-
-			if err := cfg.CreateUserUseCase.Execute(r.Context(), user); err != nil {
-				cfg.Logger.Error("failed to create user", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(dto.UserOutput{
-				ID:       user.ID,
-				Name:     user.Name,
-				IsActive: user.IsActive,
-			})
-		})
-	}
-
-	if cfg.SetUserActiveUseCase != nil {
-		r.Post("/users/{id}/status", func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			var payload struct {
-				IsActive bool `json:"is_active"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-				cfg.Logger.Error("failed to decode user status payload", "error", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			user, err := cfg.SetUserActiveUseCase.Execute(r.Context(), id, payload.IsActive)
+			prs, err := cfg.GetReviewerPRsUseCase.Execute(r.Context(), userID)
 			if err != nil {
-				if errors.Is(err, domain.ErrUserNotFound) {
-					w.WriteHeader(http.StatusNotFound)
-					return
-				}
-				cfg.Logger.Error("failed to update user status", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
+				cfg.Logger.ErrorContext(r.Context(), "ошибка получения pull request пользователя", "error", err, "user_id", userID)
+				respondError(cfg.Logger, w, http.StatusInternalServerError, "INTERNAL", err.Error())
 				return
 			}
 
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(dto.UserOutput{
-				ID:       user.ID,
-				Name:     user.Name,
-				IsActive: user.IsActive,
-			})
-		})
-	}
-
-	if cfg.ListTeamsUseCase != nil {
-		r.Get("/teams", func(w http.ResponseWriter, r *http.Request) {
-			teams, err := cfg.ListTeamsUseCase.Execute(r.Context())
-			if err != nil {
-				cfg.Logger.Error("failed to list teams", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			response := make([]dto.TeamOutput, 0, len(teams))
-			for _, team := range teams {
-				users := make([]dto.UserOutput, 0, len(team.Users))
-				for _, user := range team.Users {
-					users = append(users, dto.UserOutput{
-						ID:       user.ID,
-						Name:     user.Name,
-						IsActive: user.IsActive,
-					})
-				}
-				response = append(response, dto.TeamOutput{
-					Name:  team.Name,
-					Users: users,
-				})
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(response); err != nil {
-				cfg.Logger.Error("failed to encode teams", "error", err)
-			}
-		})
-	}
-
-	if cfg.CreateTeamUseCase != nil {
-		r.Post("/teams", func(w http.ResponseWriter, r *http.Request) {
-			var input dto.TeamInput
-			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-				cfg.Logger.Error("failed to decode team", "error", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			users := make([]domain.User, 0, len(input.Users))
-			for _, u := range input.Users {
-				if u.ID == "" || u.Name == "" {
-					w.WriteHeader(http.StatusBadRequest)
-					return
-				}
-				isActive := true
-				if u.IsActive != nil {
-					isActive = *u.IsActive
-				}
-				users = append(users, domain.User{ID: u.ID, Name: u.Name, IsActive: isActive})
-			}
-
-			team := domain.NewTeam(input.Name, users)
-			if err := cfg.CreateTeamUseCase.Execute(r.Context(), team); err != nil {
-				cfg.Logger.Error("failed to create team", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			w.WriteHeader(http.StatusCreated)
-		})
-	}
-
-	if cfg.ListPullRequestsUseCase != nil {
-		r.Get("/pull-requests", func(w http.ResponseWriter, r *http.Request) {
-			prs, err := cfg.ListPullRequestsUseCase.Execute(r.Context())
-			if err != nil {
-				cfg.Logger.Error("failed to list pull requests", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			response := make([]dto.PullRequestOutput, 0, len(prs))
-			for _, pr := range prs {
-				response = append(response, dto.PullRequestOutput{
-					ID:                pr.ID,
-					Title:             pr.Title,
-					AuthorID:          pr.AuthorID,
-					TeamName:          pr.TeamName,
-					Reviewers:         pr.Reviewers,
-					Status:            pr.Status,
-					NeedMoreReviewers: pr.NeedMoreReviewers,
-				})
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(response); err != nil {
-				cfg.Logger.Error("failed to encode pull requests", "error", err)
-			}
-		})
-	}
-
-	if cfg.CreatePullRequestUseCase != nil {
-		r.Post("/pull-requests", func(w http.ResponseWriter, r *http.Request) {
-			var input dto.CreatePullRequestInput
-			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-				cfg.Logger.Error("failed to decode pull request", "error", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			if input.ID == "" || input.Title == "" || input.AuthorID == "" || input.TeamName == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			pr := domain.NewPullRequest(input.ID, input.Title, input.AuthorID, input.TeamName)
-
-			created, err := cfg.CreatePullRequestUseCase.Execute(r.Context(), pr)
-			if err != nil {
-				cfg.Logger.Error("failed to create pull request", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(dto.PullRequestOutput{
-				ID:                created.ID,
-				Title:             created.Title,
-				AuthorID:          created.AuthorID,
-				TeamName:          created.TeamName,
-				Reviewers:         created.Reviewers,
-				Status:            created.Status,
-				NeedMoreReviewers: created.NeedMoreReviewers,
-			})
-		})
-	}
-
-	if cfg.MergePullRequestUseCase != nil {
-		r.Post("/pull-requests/{id}/merge", func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			merged, err := cfg.MergePullRequestUseCase.Execute(r.Context(), id)
-			if err != nil {
-				if errors.Is(err, domain.ErrPullRequestNotFound) {
-					w.WriteHeader(http.StatusNotFound)
-					return
-				}
-				cfg.Logger.Error("failed to merge pull request", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(dto.PullRequestOutput{
-				ID:                merged.ID,
-				Title:             merged.Title,
-				AuthorID:          merged.AuthorID,
-				TeamName:          merged.TeamName,
-				Reviewers:         merged.Reviewers,
-				Status:            merged.Status,
-				NeedMoreReviewers: merged.NeedMoreReviewers,
-			})
-		})
-	}
-
-	if cfg.AssignReviewerUseCase != nil {
-		r.Post("/pull-requests/{id}/reviewers", func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			var payload struct {
-				UserID string `json:"user_id"`
-			}
-
-			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-				cfg.Logger.Error("failed to decode reviewer payload", "error", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			if payload.UserID == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			updated, err := cfg.AssignReviewerUseCase.Execute(r.Context(), id, payload.UserID)
-			if err != nil {
-				switch {
-				case errors.Is(err, domain.ErrPullRequestNotFound):
-					w.WriteHeader(http.StatusNotFound)
-				case errors.Is(err, domain.ErrTeamNotFound):
-					w.WriteHeader(http.StatusBadRequest)
-				case errors.Is(err, domain.ErrReviewerAlreadyAdded):
-					w.WriteHeader(http.StatusConflict)
-				case errors.Is(err, domain.ErrPullRequestMerged):
-					w.WriteHeader(http.StatusConflict)
-				case errors.Is(err, domain.ErrReviewerInactive):
-					w.WriteHeader(http.StatusConflict)
-				case errors.Is(err, domain.ErrReviewerNotInTeam):
-					w.WriteHeader(http.StatusBadRequest)
-				case errors.Is(err, domain.ErrReviewerIsAuthor):
-					w.WriteHeader(http.StatusConflict)
-				case errors.Is(err, domain.ErrReviewerLimitReached):
-					w.WriteHeader(http.StatusConflict)
-				default:
-					cfg.Logger.Error("failed to assign reviewer", "error", err)
-					w.WriteHeader(http.StatusInternalServerError)
-				}
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(dto.PullRequestOutput{
-				ID:                updated.ID,
-				Title:             updated.Title,
-				AuthorID:          updated.AuthorID,
-				TeamName:          updated.TeamName,
-				Reviewers:         updated.Reviewers,
-				Status:            updated.Status,
-				NeedMoreReviewers: updated.NeedMoreReviewers,
-			})
-		})
-	}
-
-	if cfg.ReassignReviewerUseCase != nil {
-		r.Post("/pull-requests/{id}/reviewers/reassign", func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			var payload struct {
-				OldReviewerID string  `json:"old_reviewer_id"`
-				NewReviewerID *string `json:"new_reviewer_id,omitempty"`
-			}
-
-			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-				cfg.Logger.Error("failed to decode reassign payload", "error", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			if payload.OldReviewerID == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			newReviewerID := ""
-			if payload.NewReviewerID != nil {
-				newReviewerID = *payload.NewReviewerID
-			}
-
-			updated, err := cfg.ReassignReviewerUseCase.Execute(r.Context(), id, payload.OldReviewerID, newReviewerID)
-			if err != nil {
-				switch {
-				case errors.Is(err, domain.ErrPullRequestNotFound):
-					w.WriteHeader(http.StatusNotFound)
-				case errors.Is(err, domain.ErrTeamNotFound):
-					w.WriteHeader(http.StatusBadRequest)
-				case errors.Is(err, domain.ErrReviewerNotAssigned):
-					w.WriteHeader(http.StatusNotFound)
-				case errors.Is(err, domain.ErrReviewerInactive):
-					w.WriteHeader(http.StatusConflict)
-				case errors.Is(err, domain.ErrReviewerNotInTeam):
-					w.WriteHeader(http.StatusBadRequest)
-				case errors.Is(err, domain.ErrReviewerIsAuthor):
-					w.WriteHeader(http.StatusConflict)
-				case errors.Is(err, domain.ErrReviewerAlreadyAdded):
-					w.WriteHeader(http.StatusConflict)
-				case errors.Is(err, domain.ErrPullRequestMerged):
-					w.WriteHeader(http.StatusConflict)
-				case errors.Is(err, domain.ErrReviewerLimitReached):
-					w.WriteHeader(http.StatusConflict)
-				default:
-					cfg.Logger.Error("failed to reassign reviewer", "error", err)
-					w.WriteHeader(http.StatusInternalServerError)
-				}
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(dto.PullRequestOutput{
-				ID:                updated.ID,
-				Title:             updated.Title,
-				AuthorID:          updated.AuthorID,
-				TeamName:          updated.TeamName,
-				Reviewers:         updated.Reviewers,
-				Status:            updated.Status,
-				NeedMoreReviewers: updated.NeedMoreReviewers,
-			})
-		})
-	}
-
-	if cfg.GetReviewerPRsUseCase != nil {
-		r.Get("/users/{id}/reviews", func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-			if id == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			prs, err := cfg.GetReviewerPRsUseCase.Execute(r.Context(), id)
-			if err != nil {
-				cfg.Logger.Error("failed to list reviewer pull requests", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			response := dto.ReviewerPullRequestsOutput{
-				ReviewerID:   id,
-				PullRequests: make([]dto.PullRequestOutput, 0, len(prs)),
+			response := dto.ReviewerPullRequestsResponse{
+				UserID:       userID,
+				PullRequests: make([]dto.PullRequestShort, 0, len(prs)),
 			}
 			for _, pr := range prs {
-				response.PullRequests = append(response.PullRequests, dto.PullRequestOutput{
-					ID:                pr.ID,
-					Title:             pr.Title,
-					AuthorID:          pr.AuthorID,
-					TeamName:          pr.TeamName,
-					Reviewers:         pr.Reviewers,
-					Status:            pr.Status,
-					NeedMoreReviewers: pr.NeedMoreReviewers,
+				response.PullRequests = append(response.PullRequests, dto.PullRequestShort{
+					PullRequestID:   pr.ID,
+					PullRequestName: pr.Title,
+					AuthorID:        pr.AuthorID,
+					Status:          pr.Status,
 				})
 			}
 
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(response); err != nil {
-				cfg.Logger.Error("failed to encode reviewer pull requests", "error", err)
-			}
+			respondJSON(cfg.Logger, w, http.StatusOK, response)
 		})
-	}
+	})
 
 	return r
+}
+
+func adminAuth(logger *slog.Logger, token string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !checkBearer(r, token) {
+				logger.WarnContext(r.Context(), "неверный админ токен")
+				respondError(logger, w, http.StatusUnauthorized, "UNAUTHORIZED", "admin token required")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func userAuth(logger *slog.Logger, adminToken, userToken string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if checkBearer(r, adminToken) || checkBearer(r, userToken) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			logger.WarnContext(r.Context(), "неверный пользовательский токен")
+			respondError(logger, w, http.StatusUnauthorized, "UNAUTHORIZED", "token required")
+		})
+	}
+}
+
+func checkBearer(r *http.Request, token string) bool {
+	if token == "" {
+		return false
+	}
+	value := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	return len(value) == len(prefix)+len(token) && value[:len(prefix)] == prefix && value[len(prefix):] == token
+}
+
+func respondJSON(logger *slog.Logger, w http.ResponseWriter, status int, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		logger.Error("не удалось закодировать ответ", "error", err)
+	}
+}
+
+func respondError(logger *slog.Logger, w http.ResponseWriter, status int, code, message string) {
+	respondJSON(logger, w, status, dto.ErrorResponse{
+		Error: dto.ErrorBody{
+			Code:    code,
+			Message: message,
+		},
+	})
+}
+
+func respondBadRequest(logger *slog.Logger, r *http.Request, w http.ResponseWriter, code, message string, err error) {
+	if err != nil {
+		logger.WarnContext(r.Context(), "ошибка декодирования запроса", "error", err)
+	} else {
+		logger.WarnContext(r.Context(), "ошибка валидации запроса", "message", message)
+	}
+	respondError(logger, w, http.StatusBadRequest, code, message)
+}
+
+func toTeam(team domain.Team) dto.Team {
+	result := dto.Team{
+		TeamName: team.Name,
+		Members:  make([]dto.TeamMember, 0, len(team.Users)),
+	}
+	for _, user := range team.Users {
+		result.Members = append(result.Members, dto.TeamMember{
+			UserID:   user.ID,
+			Username: user.Name,
+			IsActive: user.IsActive,
+		})
+	}
+	return result
+}
+
+func toUser(user domain.User) dto.User {
+	return dto.User{
+		UserID:   user.ID,
+		Username: user.Name,
+		TeamName: user.TeamName,
+		IsActive: user.IsActive,
+	}
+}
+
+func toPullRequest(pr domain.PullRequest) dto.PullRequest {
+	return dto.PullRequest{
+		PullRequestID:     pr.ID,
+		PullRequestName:   pr.Title,
+		AuthorID:          pr.AuthorID,
+		Status:            pr.Status,
+		AssignedReviewers: append([]string(nil), pr.Reviewers...),
+		CreatedAt:         pr.CreatedAt,
+		MergedAt:          pr.MergedAt,
+	}
+}
+
+func mapTeamError(err error) (int, string, string) {
+	switch {
+	case errors.Is(err, domain.ErrTeamExists):
+		return http.StatusBadRequest, "TEAM_EXISTS", "team_name already exists"
+	default:
+		return http.StatusInternalServerError, "INTERNAL", "internal error"
+	}
+}
+
+func mapUserError(err error) (int, string, string) {
+	switch {
+	case errors.Is(err, domain.ErrUserNotFound):
+		return http.StatusNotFound, "NOT_FOUND", "user not found"
+	default:
+		return http.StatusInternalServerError, "INTERNAL", "internal error"
+	}
+}
+
+func mapPullRequestCreateError(err error) (int, string, string) {
+	switch {
+	case errors.Is(err, domain.ErrPullRequestExists):
+		return http.StatusConflict, "PR_EXISTS", "pull request already exists"
+	case errors.Is(err, domain.ErrUserNotFound):
+		return http.StatusNotFound, "NOT_FOUND", "author not found"
+	case errors.Is(err, domain.ErrTeamNotFound):
+		return http.StatusNotFound, "NOT_FOUND", "team not found"
+	case errors.Is(err, domain.ErrNoReviewerCandidates):
+		return http.StatusConflict, "NO_CANDIDATE", "no active reviewer candidates in team"
+	default:
+		return http.StatusInternalServerError, "INTERNAL", "internal error"
+	}
+}
+
+func mapMergeError(err error) (int, string, string) {
+	switch {
+	case errors.Is(err, domain.ErrPullRequestNotFound):
+		return http.StatusNotFound, "NOT_FOUND", "pull request not found"
+	default:
+		return http.StatusInternalServerError, "INTERNAL", "internal error"
+	}
+}
+
+func mapReassignError(err error) (int, string, string) {
+	switch {
+	case errors.Is(err, domain.ErrPullRequestNotFound):
+		return http.StatusNotFound, "NOT_FOUND", "pull request not found"
+	case errors.Is(err, domain.ErrReviewerNotAssigned):
+		return http.StatusConflict, "NOT_ASSIGNED", "reviewer is not assigned to this PR"
+	case errors.Is(err, domain.ErrPullRequestMerged):
+		return http.StatusConflict, "PR_MERGED", "cannot reassign reviewer on merged PR"
+	case errors.Is(err, domain.ErrUserNotFound):
+		return http.StatusNotFound, "NOT_FOUND", "user not found"
+	case errors.Is(err, domain.ErrNoReviewerCandidates):
+		return http.StatusConflict, "NO_CANDIDATE", "no active replacement candidate in team"
+	case errors.Is(err, domain.ErrReviewerInactive):
+		return http.StatusConflict, "NO_CANDIDATE", "reviewer inactive"
+	default:
+		return http.StatusInternalServerError, "INTERNAL", "internal error"
+	}
 }

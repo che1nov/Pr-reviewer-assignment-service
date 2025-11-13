@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/config"
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/app"
@@ -23,7 +24,7 @@ func main() {
 
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), application.ShutdownTimeout())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*15))
 		defer cancel()
 		if err := application.Shutdown(shutdownCtx); err != nil {
 			log.Error("shutdown failed", "error", err)

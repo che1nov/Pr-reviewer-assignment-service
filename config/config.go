@@ -1,24 +1,20 @@
 package config
 
-import (
-	"os"
-	"strconv"
-	"time"
-)
+import "os"
 
 type Config struct {
-	LogLevel        string
-	Message         string
-	HTTPPort        string
-	ShutdownTimeout time.Duration
+	LogLevel   string
+	HTTPPort   string
+	AdminToken string
+	UserToken  string
 }
 
 func Load() Config {
 	return Config{
-		LogLevel:        os.Getenv("LOG_LEVEL"),
-		Message:         fallback(os.Getenv("APP_MESSAGE"), "Привет!"),
-		HTTPPort:        fallback(os.Getenv("HTTP_PORT"), "8080"),
-		ShutdownTimeout: parseShutdownTimeout(os.Getenv("SHUTDOWN_TIMEOUT_SECONDS")),
+		LogLevel:   os.Getenv("LOG_LEVEL"),
+		HTTPPort:   fallback(os.Getenv("HTTP_PORT"), "8080"),
+		AdminToken: os.Getenv("ADMIN_TOKEN"),
+		UserToken:  os.Getenv("USER_TOKEN"),
 	}
 }
 
@@ -27,15 +23,4 @@ func fallback(value, def string) string {
 		return def
 	}
 	return value
-}
-
-func parseShutdownTimeout(value string) time.Duration {
-	if value == "" {
-		return 5 * time.Second
-	}
-	seconds, err := strconv.Atoi(value)
-	if err != nil || seconds <= 0 {
-		return 5 * time.Second
-	}
-	return time.Duration(seconds) * time.Second
 }

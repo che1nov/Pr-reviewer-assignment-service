@@ -2,30 +2,34 @@ package usecases
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 )
 
-type ListPullRequestsUseCase struct {
-	storage PullRequestStorage
-}
-
-func NewListPullRequestsUseCase(storage PullRequestStorage) *ListPullRequestsUseCase {
-	return &ListPullRequestsUseCase{storage: storage}
-}
-
-func (uc *ListPullRequestsUseCase) Execute(ctx context.Context) ([]domain.PullRequest, error) {
-	return uc.storage.ListPullRequests(ctx)
-}
-
+// GetReviewerPullRequestsUseCase возвращает PR, где пользователь ревьюер.
 type GetReviewerPullRequestsUseCase struct {
-	storage PullRequestStorage
+	prs PullRequestStorage
+	log *slog.Logger
 }
 
-func NewGetReviewerPullRequestsUseCase(storage PullRequestStorage) *GetReviewerPullRequestsUseCase {
-	return &GetReviewerPullRequestsUseCase{storage: storage}
+// NewGetReviewerPullRequestsUseCase создаёт use case списка PR ревьюера.
+func NewGetReviewerPullRequestsUseCase(storage PullRequestStorage, log *slog.Logger) *GetReviewerPullRequestsUseCase {
+	return &GetReviewerPullRequestsUseCase{
+		prs: storage,
+		log: log,
+	}
 }
 
+// Execute отдаёт pull request пользователя.
 func (uc *GetReviewerPullRequestsUseCase) Execute(ctx context.Context, reviewerID string) ([]domain.PullRequest, error) {
-	return uc.storage.ListPullRequestsByReviewer(ctx, reviewerID)
+	uc.log.InfoContext(ctx, "получаем pull request для ревьюера", "reviewer_id", reviewerID)
+
+	prs, err := uc.prs.ListPullRequestsByReviewer(ctx, reviewerID)
+	if err != nil {
+		uc.log.ErrorContext(ctx, "ошибка выборки pull request", "error", err, "reviewer_id", reviewerID)
+		return nil, err
+	}
+
+	return prs, nil
 }

@@ -11,44 +11,42 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/adapters/memory"
 	httpcontroller "github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/controllers/http"
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/usecases"
+	"github.com/che1nov/backend-trainee-assignment-autumn-2025/pkg/clock"
+	"github.com/che1nov/backend-trainee-assignment-autumn-2025/pkg/random"
 )
 
+// App запущенное приложение
 type App struct {
 	server *http.Server
 	logger *slog.Logger
 	cfg    config.Config
 }
 
+// New настройка приложения
 func New(cfg config.Config, logger *slog.Logger) *App {
-	userStorage := memory.NewUserStorage()
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	storage := memory.NewUserStorage(logger)
+	clockAdapter := clock.NewSystem()
+	randomAdapter := random.New(rand.New(rand.NewSource(time.Now().UnixNano())))
 
-	createUserUC := usecases.NewCreateUserUseCase(userStorage)
-	listUsersUC := usecases.NewListUsersUseCase(userStorage)
-	setUserActiveUC := usecases.NewSetUserActiveUseCase(userStorage)
-	createTeamUC := usecases.NewCreateTeamUseCase(userStorage, userStorage)
-	listTeamsUC := usecases.NewListTeamsUseCase(userStorage)
-	createPRUC := usecases.NewCreatePullRequestUseCase(userStorage, userStorage, rng)
-	listPRsUC := usecases.NewListPullRequestsUseCase(userStorage)
-	getReviewerPRsUC := usecases.NewGetReviewerPullRequestsUseCase(userStorage)
-	mergePRUC := usecases.NewMergePullRequestUseCase(userStorage)
-	assignReviewerUC := usecases.NewAssignReviewerUseCase(userStorage, userStorage, userStorage)
-	reassignReviewerUC := usecases.NewReassignReviewerUseCase(userStorage, userStorage, userStorage, rng)
+	createTeamUC := usecases.NewCreateTeamUseCase(storage, storage, logger)
+	getTeamUC := usecases.NewGetTeamUseCase(storage, logger)
+	setUserActiveUC := usecases.NewSetUserActiveUseCase(storage, logger)
+	createPullRequestUC := usecases.NewCreatePullRequestUseCase(storage, storage, storage, clockAdapter, randomAdapter, logger)
+	mergePullRequestUC := usecases.NewMergePullRequestUseCase(storage, clockAdapter, logger)
+	reassignReviewerUC := usecases.NewReassignReviewerUseCase(storage, storage, storage, randomAdapter, logger)
+	getReviewerPRsUC := usecases.NewGetReviewerPullRequestsUseCase(storage, logger)
 
 	router := httpcontroller.NewRouter(httpcontroller.RouterConfig{
-		Message:                  cfg.Message,
-		CreateUserUseCase:        createUserUC,
-		ListUsersUseCase:         listUsersUC,
+		Logger:                   logger,
+		AdminToken:               cfg.AdminToken,
+		UserToken:                cfg.UserToken,
+		AddTeamUseCase:           createTeamUC,
+		GetTeamUseCase:           getTeamUC,
 		SetUserActiveUseCase:     setUserActiveUC,
-		CreateTeamUseCase:        createTeamUC,
-		ListTeamsUseCase:         listTeamsUC,
-		CreatePullRequestUseCase: createPRUC,
-		ListPullRequestsUseCase:  listPRsUC,
-		MergePullRequestUseCase:  mergePRUC,
-		AssignReviewerUseCase:    assignReviewerUC,
+		CreatePullRequestUseCase: createPullRequestUC,
+		MergePullRequestUseCase:  mergePullRequestUC,
 		ReassignReviewerUseCase:  reassignReviewerUC,
 		GetReviewerPRsUseCase:    getReviewerPRsUC,
-		Logger:                   logger,
 	})
 
 	server := &http.Server{
@@ -64,16 +62,14 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 	}
 }
 
+// Start запускает HTTP сервер.
 func (a *App) Start() error {
 	a.logger.Info("запускаем HTTP сервер", "addr", a.server.Addr)
 	return a.server.ListenAndServe()
 }
 
+// Shutdown останавливает сервер.
 func (a *App) Shutdown(ctx context.Context) error {
 	a.logger.Info("останавливаем HTTP сервер")
 	return a.server.Shutdown(ctx)
-}
-
-func (a *App) ShutdownTimeout() time.Duration {
-	return a.cfg.ShutdownTimeout
 }

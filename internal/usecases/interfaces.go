@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"time"
 
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 )
@@ -25,4 +26,12 @@ type PullRequestStorage interface {
 	GetPullRequest(ctx context.Context, id string) (domain.PullRequest, error)
 	UpdatePullRequest(ctx context.Context, pr domain.PullRequest) error
 	ListPullRequestsByReviewer(ctx context.Context, reviewerID string) ([]domain.PullRequest, error)
+}
+
+type ClockAdapter interface {
+	Now() time.Time
+}
+
+type RandomAdapter interface {
+	Shuffle(n int, swap func(i, j int))
 }

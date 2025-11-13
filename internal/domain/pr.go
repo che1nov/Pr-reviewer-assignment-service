@@ -1,34 +1,43 @@
 package domain
 
+import "time"
+
 type PullRequest struct {
-	ID                string
-	Title             string
-	AuthorID          string
-	TeamName          string
-	Reviewers         []string
-	Status            string
-	NeedMoreReviewers bool
+	ID        string
+	Title     string
+	AuthorID  string
+	TeamName  string
+	Reviewers []string
+	Status    string
+	CreatedAt time.Time
+	MergedAt  *time.Time
 }
 
-func NewPullRequest(id, title, authorID, teamName string) PullRequest {
+func NewPullRequest(id, title, authorID, teamName string, createdAt time.Time) PullRequest {
 	return PullRequest{
-		ID:                id,
-		Title:             title,
-		AuthorID:          authorID,
-		TeamName:          teamName,
-		Status:            "OPEN",
-		Reviewers:         []string{},
-		NeedMoreReviewers: true,
+		ID:        id,
+		Title:     title,
+		AuthorID:  authorID,
+		TeamName:  teamName,
+		Status:    "OPEN",
+		Reviewers: make([]string, 0, 2),
+		CreatedAt: createdAt,
 	}
 }
 
 func (pr *PullRequest) AssignReviewers(reviewers []string) {
 	pr.Reviewers = reviewers
-	pr.NeedMoreReviewers = len(reviewers) < 2
 }
 
-func (pr *PullRequest) MarkMerged() {
+func (pr *PullRequest) MarkMerged(mergedAt time.Time) {
+	if pr.Status == "MERGED" {
+		if pr.MergedAt == nil {
+			pr.MergedAt = &mergedAt
+		}
+		return
+	}
 	pr.Status = "MERGED"
+	pr.MergedAt = &mergedAt
 }
 
 func (pr *PullRequest) AddReviewer(reviewerID string) error {
@@ -47,7 +56,6 @@ func (pr *PullRequest) AddReviewer(reviewerID string) error {
 		return ErrReviewerLimitReached
 	}
 	pr.Reviewers = append(pr.Reviewers, reviewerID)
-	pr.NeedMoreReviewers = len(pr.Reviewers) < 2
 	return nil
 }
 
@@ -58,7 +66,9 @@ func (pr *PullRequest) ReplaceReviewer(oldReviewerID, newReviewerID string) erro
 	if newReviewerID == pr.AuthorID {
 		return ErrReviewerIsAuthor
 	}
-	found := false
+	if newReviewerID == oldReviewerID {
+		return ErrReviewerAlreadyAdded
+	}
 	for _, existing := range pr.Reviewers {
 		if existing == newReviewerID {
 			return ErrReviewerAlreadyAdded
@@ -67,13 +77,8 @@ func (pr *PullRequest) ReplaceReviewer(oldReviewerID, newReviewerID string) erro
 	for i, existing := range pr.Reviewers {
 		if existing == oldReviewerID {
 			pr.Reviewers[i] = newReviewerID
-			found = true
-			break
+			return nil
 		}
 	}
-	if !found {
-		return ErrReviewerNotAssigned
-	}
-	pr.NeedMoreReviewers = len(pr.Reviewers) < 2
-	return nil
+	return ErrReviewerNotAssigned
 }

@@ -1,11 +1,12 @@
 package dto
 
-type TeamInput struct {
-	Name  string      `json:"name"`
-	Users []UserInput `json:"users"`
+type TeamMember struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	IsActive bool   `json:"is_active"`
 }
 
-type TeamOutput struct {
-	Name  string       `json:"name"`
-	Users []UserOutput `json:"users"`
+type Team struct {
+	TeamName string       `json:"team_name"`
+	Members  []TeamMember `json:"members"`
 }
