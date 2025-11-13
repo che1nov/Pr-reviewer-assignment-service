@@ -7,8 +7,10 @@ import (
 )
 
 type UserStorage interface {
-	CreateUser(ctx context.Context, id, name string) error
+	CreateUser(ctx context.Context, user domain.User) error
 	ListUsers(ctx context.Context) ([]domain.User, error)
+	GetUser(ctx context.Context, id string) (domain.User, error)
+	UpdateUser(ctx context.Context, user domain.User) error
 }
 
 type TeamStorage interface {

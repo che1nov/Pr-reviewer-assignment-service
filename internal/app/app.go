@@ -22,12 +22,13 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 	userStorage := memory.NewUserStorage()
 	createUserUC := usecases.NewCreateUserUseCase(userStorage)
 	listUsersUC := usecases.NewListUsersUseCase(userStorage)
+	setUserActiveUC := usecases.NewSetUserActiveUseCase(userStorage)
 	createTeamUC := usecases.NewCreateTeamUseCase(userStorage, userStorage)
 	listTeamsUC := usecases.NewListTeamsUseCase(userStorage)
 	createPRUC := usecases.NewCreatePullRequestUseCase(userStorage, userStorage)
 	listPRsUC := usecases.NewListPullRequestsUseCase(userStorage)
 	mergePRUC := usecases.NewMergePullRequestUseCase(userStorage)
-	assignReviewerUC := usecases.NewAssignReviewerUseCase(userStorage, userStorage)
+	assignReviewerUC := usecases.NewAssignReviewerUseCase(userStorage, userStorage, userStorage)
 
 	router := httpcontroller.NewRouter(httpcontroller.RouterConfig{
 		Message:                  cfg.Message,
@@ -39,6 +40,7 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 		ListPullRequestsUseCase:  listPRsUC,
 		MergePullRequestUseCase:  mergePRUC,
 		AssignReviewerUseCase:    assignReviewerUC,
+		SetUserActiveUseCase:     setUserActiveUC,
 		Logger:                   logger,
 	})
 

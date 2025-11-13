@@ -19,15 +19,16 @@ func NewCreateTeamUseCase(teamStorage TeamStorage, userStorage UserStorage) *Cre
 }
 
 func (uc *CreateTeamUseCase) Execute(ctx context.Context, team domain.Team) error {
-	if err := uc.storage.CreateTeam(ctx, team); err != nil {
-		return err
-	}
-
-	for _, user := range team.Users {
-		if err := uc.userStore.CreateUser(ctx, user.ID, user.Name); err != nil {
+	for i := range team.Users {
+		user := team.Users[i]
+		if !user.IsActive {
+			user.IsActive = true
+		}
+		if err := uc.userStore.CreateUser(ctx, user); err != nil {
 			return err
 		}
+		team.Users[i] = user
 	}
 
-	return nil
+	return uc.storage.CreateTeam(ctx, team)
 }

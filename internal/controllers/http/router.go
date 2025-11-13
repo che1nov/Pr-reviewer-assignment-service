@@ -18,6 +18,7 @@ type RouterConfig struct {
 	Message                  string
 	CreateUserUseCase        *usecases.CreateUserUseCase
 	ListUsersUseCase         *usecases.ListUsersUseCase
+	SetUserActiveUseCase     *usecases.SetUserActiveUseCase
 	CreateTeamUseCase        *usecases.CreateTeamUseCase
 	ListTeamsUseCase         *usecases.ListTeamsUseCase
 	CreatePullRequestUseCase *usecases.CreatePullRequestUseCase
@@ -59,8 +60,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			}
 			for _, user := range users {
 				response.Users = append(response.Users, dto.UserOutput{
-					ID:   user.ID,
-					Name: user.Name,
+					ID:       user.ID,
+					Name:     user.Name,
+					IsActive: user.IsActive,
 				})
 			}
 
@@ -86,7 +88,18 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				return
 			}
 
-			if err := cfg.CreateUserUseCase.Execute(r.Context(), input.ID, input.Name); err != nil {
+			isActive := true
+			if input.IsActive != nil {
+				isActive = *input.IsActive
+			}
+
+			user := domain.User{
+				ID:       input.ID,
+				Name:     input.Name,
+				IsActive: isActive,
+			}
+
+			if err := cfg.CreateUserUseCase.Execute(r.Context(), user); err != nil {
 				cfg.Logger.Error("failed to create user", "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
@@ -94,7 +107,49 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(dto.UserOutput{ID: input.ID, Name: input.Name})
+			_ = json.NewEncoder(w).Encode(dto.UserOutput{
+				ID:       user.ID,
+				Name:     user.Name,
+				IsActive: user.IsActive,
+			})
+		})
+	}
+
+	if cfg.SetUserActiveUseCase != nil {
+		r.Post("/users/{id}/status", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			var payload struct {
+				IsActive bool `json:"is_active"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				cfg.Logger.Error("failed to decode user status payload", "error", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			user, err := cfg.SetUserActiveUseCase.Execute(r.Context(), id, payload.IsActive)
+			if err != nil {
+				if errors.Is(err, domain.ErrUserNotFound) {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				cfg.Logger.Error("failed to update user status", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(dto.UserOutput{
+				ID:       user.ID,
+				Name:     user.Name,
+				IsActive: user.IsActive,
+			})
 		})
 	}
 
@@ -111,7 +166,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			for _, team := range teams {
 				users := make([]dto.UserOutput, 0, len(team.Users))
 				for _, user := range team.Users {
-					users = append(users, dto.UserOutput{ID: user.ID, Name: user.Name})
+					users = append(users, dto.UserOutput{
+						ID:       user.ID,
+						Name:     user.Name,
+						IsActive: user.IsActive,
+					})
 				}
 				response = append(response, dto.TeamOutput{
 					Name:  team.Name,
@@ -142,7 +201,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
-				users = append(users, domain.User{ID: u.ID, Name: u.Name})
+				isActive := true
+				if u.IsActive != nil {
+					isActive = *u.IsActive
+				}
+				users = append(users, domain.User{ID: u.ID, Name: u.Name, IsActive: isActive})
 			}
 
 			team := domain.NewTeam(input.Name, users)
@@ -289,6 +352,14 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				case errors.Is(err, domain.ErrReviewerAlreadyAdded):
 					w.WriteHeader(http.StatusConflict)
 				case errors.Is(err, domain.ErrPullRequestMerged):
+					w.WriteHeader(http.StatusConflict)
+				case errors.Is(err, domain.ErrReviewerInactive):
+					w.WriteHeader(http.StatusConflict)
+				case errors.Is(err, domain.ErrReviewerNotInTeam):
+					w.WriteHeader(http.StatusBadRequest)
+				case errors.Is(err, domain.ErrReviewerIsAuthor):
+					w.WriteHeader(http.StatusConflict)
+				case errors.Is(err, domain.ErrReviewerLimitReached):
 					w.WriteHeader(http.StatusConflict)
 				default:
 					cfg.Logger.Error("failed to assign reviewer", "error", err)

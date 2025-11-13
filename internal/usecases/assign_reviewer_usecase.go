@@ -9,12 +9,14 @@ import (
 type AssignReviewerUseCase struct {
 	prStorage   PullRequestStorage
 	teamStorage TeamStorage
+	userStorage UserStorage
 }
 
-func NewAssignReviewerUseCase(prStorage PullRequestStorage, teamStorage TeamStorage) *AssignReviewerUseCase {
+func NewAssignReviewerUseCase(prStorage PullRequestStorage, teamStorage TeamStorage, userStorage UserStorage) *AssignReviewerUseCase {
 	return &AssignReviewerUseCase{
 		prStorage:   prStorage,
 		teamStorage: teamStorage,
+		userStorage: userStorage,
 	}
 }
 
@@ -24,21 +26,28 @@ func (uc *AssignReviewerUseCase) Execute(ctx context.Context, prID, userID strin
 		return domain.PullRequest{}, err
 	}
 
+	member, err := uc.userStorage.GetUser(ctx, userID)
+	if err != nil {
+		return domain.PullRequest{}, err
+	}
+	if !member.IsActive {
+		return domain.PullRequest{}, domain.ErrReviewerInactive
+	}
+
 	team, err := uc.teamStorage.GetTeam(ctx, pr.TeamName)
 	if err != nil {
 		return domain.PullRequest{}, err
 	}
 
-	// проверяем, что пользователь есть в команде и не автор
 	isTeamMember := false
-	for _, member := range team.Users {
-		if member.ID == userID {
+	for _, teamMember := range team.Users {
+		if teamMember.ID == userID {
 			isTeamMember = true
 			break
 		}
 	}
 	if !isTeamMember {
-		return domain.PullRequest{}, domain.ErrReviewerAlreadyAdded
+		return domain.PullRequest{}, domain.ErrReviewerNotInTeam
 	}
 
 	if err := pr.AddReviewer(userID); err != nil {

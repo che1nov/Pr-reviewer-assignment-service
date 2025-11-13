@@ -9,23 +9,23 @@ import (
 
 type UserStorage struct {
 	mu    sync.RWMutex
-	users map[string]string
+	users map[string]domain.User
 	teams map[string]domain.Team
 	prs   map[string]domain.PullRequest
 }
 
 func NewUserStorage() *UserStorage {
 	return &UserStorage{
-		users: make(map[string]string),
+		users: make(map[string]domain.User),
 		teams: make(map[string]domain.Team),
 		prs:   make(map[string]domain.PullRequest),
 	}
 }
 
-func (s *UserStorage) CreateUser(_ context.Context, id, name string) error {
+func (s *UserStorage) CreateUser(_ context.Context, user domain.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.users[id] = name
+	s.users[user.ID] = user
 	return nil
 }
 
@@ -34,11 +34,46 @@ func (s *UserStorage) ListUsers(_ context.Context) ([]domain.User, error) {
 	defer s.mu.RUnlock()
 
 	users := make([]domain.User, 0, len(s.users))
-	for id, name := range s.users {
-		users = append(users, domain.User{ID: id, Name: name})
+	for _, user := range s.users {
+		users = append(users, user)
 	}
 
 	return users, nil
+}
+
+func (s *UserStorage) GetUser(_ context.Context, id string) (domain.User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	user, ok := s.users[id]
+	if !ok {
+		return domain.User{}, domain.ErrUserNotFound
+	}
+	return user, nil
+}
+
+func (s *UserStorage) UpdateUser(_ context.Context, user domain.User) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.users[user.ID]; !ok {
+		return domain.ErrUserNotFound
+	}
+	s.users[user.ID] = user
+
+	for name, team := range s.teams {
+		updated := false
+		for i, member := range team.Users {
+			if member.ID == user.ID {
+				team.Users[i] = user
+				updated = true
+			}
+		}
+		if updated {
+			s.teams[name] = team
+		}
+	}
+
+	return nil
 }
 
 func (s *UserStorage) CreateTeam(_ context.Context, team domain.Team) error {

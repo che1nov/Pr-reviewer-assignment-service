@@ -16,7 +16,7 @@ func NewTeam(name string, users []User) Team {
 func (t Team) ActiveReviewersExcluding(authorID string) []User {
 	reviewers := make([]User, 0, len(t.Users))
 	for _, user := range t.Users {
-		if user.ID == authorID {
+		if user.ID == authorID || !user.IsActive {
 			continue
 		}
 		reviewers = append(reviewers, user)

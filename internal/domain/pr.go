@@ -36,7 +36,7 @@ func (pr *PullRequest) AddReviewer(reviewerID string) error {
 		return ErrPullRequestMerged
 	}
 	if reviewerID == pr.AuthorID {
-		return ErrReviewerAlreadyAdded
+		return ErrReviewerIsAuthor
 	}
 	for _, existing := range pr.Reviewers {
 		if existing == reviewerID {
@@ -44,7 +44,7 @@ func (pr *PullRequest) AddReviewer(reviewerID string) error {
 		}
 	}
 	if len(pr.Reviewers) >= 2 {
-		return ErrReviewerAlreadyAdded
+		return ErrReviewerLimitReached
 	}
 	pr.Reviewers = append(pr.Reviewers, reviewerID)
 	pr.NeedMoreReviewers = len(pr.Reviewers) < 2
