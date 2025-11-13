@@ -24,4 +24,5 @@ type PullRequestStorage interface {
 	ListPullRequests(ctx context.Context) ([]domain.PullRequest, error)
 	GetPullRequest(ctx context.Context, id string) (domain.PullRequest, error)
 	UpdatePullRequest(ctx context.Context, pr domain.PullRequest) error
+	ListPullRequestsByReviewer(ctx context.Context, reviewerID string) ([]domain.PullRequest, error)
 }

@@ -16,3 +16,8 @@ type PullRequestOutput struct {
 	Status            string   `json:"status"`
 	NeedMoreReviewers bool     `json:"need_more_reviewers"`
 }
+
+type ReviewerPullRequestsOutput struct {
+	ReviewerID   string               `json:"reviewer_id"`
+	PullRequests []PullRequestOutput `json:"pull_requests"`
+}

@@ -17,3 +17,15 @@ func NewListPullRequestsUseCase(storage PullRequestStorage) *ListPullRequestsUse
 func (uc *ListPullRequestsUseCase) Execute(ctx context.Context) ([]domain.PullRequest, error) {
 	return uc.storage.ListPullRequests(ctx)
 }
+
+type GetReviewerPullRequestsUseCase struct {
+	storage PullRequestStorage
+}
+
+func NewGetReviewerPullRequestsUseCase(storage PullRequestStorage) *GetReviewerPullRequestsUseCase {
+	return &GetReviewerPullRequestsUseCase{storage: storage}
+}
+
+func (uc *GetReviewerPullRequestsUseCase) Execute(ctx context.Context, reviewerID string) ([]domain.PullRequest, error) {
+	return uc.storage.ListPullRequestsByReviewer(ctx, reviewerID)
+}

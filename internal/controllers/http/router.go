@@ -14,6 +14,7 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/usecases"
 )
 
+// RouterConfig содержит зависимости маршрутизатора
 type RouterConfig struct {
 	Message                  string
 	CreateUserUseCase        *usecases.CreateUserUseCase
@@ -25,6 +26,7 @@ type RouterConfig struct {
 	ListPullRequestsUseCase  *usecases.ListPullRequestsUseCase
 	MergePullRequestUseCase  *usecases.MergePullRequestUseCase
 	AssignReviewerUseCase    *usecases.AssignReviewerUseCase
+	GetReviewerPRsUseCase    *usecases.GetReviewerPullRequestsUseCase
 	Logger                   *slog.Logger
 }
 
@@ -379,6 +381,45 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				Status:            updated.Status,
 				NeedMoreReviewers: updated.NeedMoreReviewers,
 			})
+		})
+	}
+
+	if cfg.GetReviewerPRsUseCase != nil {
+		r.Get("/users/{id}/reviews", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			prs, err := cfg.GetReviewerPRsUseCase.Execute(r.Context(), id)
+			if err != nil {
+				cfg.Logger.Error("failed to list reviewer pull requests", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			response := dto.ReviewerPullRequestsOutput{
+				ReviewerID:   id,
+				PullRequests: make([]dto.PullRequestOutput, 0, len(prs)),
+			}
+			for _, pr := range prs {
+				response.PullRequests = append(response.PullRequests, dto.PullRequestOutput{
+					ID:                pr.ID,
+					Title:             pr.Title,
+					AuthorID:          pr.AuthorID,
+					TeamName:          pr.TeamName,
+					Reviewers:         pr.Reviewers,
+					Status:            pr.Status,
+					NeedMoreReviewers: pr.NeedMoreReviewers,
+				})
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				cfg.Logger.Error("failed to encode reviewer pull requests", "error", err)
+			}
 		})
 	}
 

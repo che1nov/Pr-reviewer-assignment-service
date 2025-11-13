@@ -27,6 +27,7 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 	listTeamsUC := usecases.NewListTeamsUseCase(userStorage)
 	createPRUC := usecases.NewCreatePullRequestUseCase(userStorage, userStorage)
 	listPRsUC := usecases.NewListPullRequestsUseCase(userStorage)
+	getReviewerPRsUC := usecases.NewGetReviewerPullRequestsUseCase(userStorage)
 	mergePRUC := usecases.NewMergePullRequestUseCase(userStorage)
 	assignReviewerUC := usecases.NewAssignReviewerUseCase(userStorage, userStorage, userStorage)
 
@@ -34,6 +35,7 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 		Message:                  cfg.Message,
 		CreateUserUseCase:        createUserUC,
 		ListUsersUseCase:         listUsersUC,
+		GetReviewerPRsUseCase:    getReviewerPRsUC,
 		CreateTeamUseCase:        createTeamUC,
 		ListTeamsUseCase:         listTeamsUC,
 		CreatePullRequestUseCase: createPRUC,

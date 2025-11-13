@@ -145,3 +145,20 @@ func (s *UserStorage) UpdatePullRequest(_ context.Context, pr domain.PullRequest
 	s.prs[pr.ID] = pr
 	return nil
 }
+
+func (s *UserStorage) ListPullRequestsByReviewer(_ context.Context, reviewerID string) ([]domain.PullRequest, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]domain.PullRequest, 0)
+	for _, pr := range s.prs {
+		for _, reviewer := range pr.Reviewers {
+			if reviewer == reviewerID {
+				result = append(result, pr)
+				break
+			}
+		}
+	}
+
+	return result, nil
+}
