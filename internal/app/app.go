@@ -30,19 +30,21 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 	getReviewerPRsUC := usecases.NewGetReviewerPullRequestsUseCase(userStorage)
 	mergePRUC := usecases.NewMergePullRequestUseCase(userStorage)
 	assignReviewerUC := usecases.NewAssignReviewerUseCase(userStorage, userStorage, userStorage)
+	reassignReviewerUC := usecases.NewReassignReviewerUseCase(userStorage, userStorage, userStorage)
 
 	router := httpcontroller.NewRouter(httpcontroller.RouterConfig{
 		Message:                  cfg.Message,
 		CreateUserUseCase:        createUserUC,
 		ListUsersUseCase:         listUsersUC,
-		GetReviewerPRsUseCase:    getReviewerPRsUC,
+		SetUserActiveUseCase:     setUserActiveUC,
 		CreateTeamUseCase:        createTeamUC,
 		ListTeamsUseCase:         listTeamsUC,
 		CreatePullRequestUseCase: createPRUC,
 		ListPullRequestsUseCase:  listPRsUC,
 		MergePullRequestUseCase:  mergePRUC,
 		AssignReviewerUseCase:    assignReviewerUC,
-		SetUserActiveUseCase:     setUserActiveUC,
+		ReassignReviewerUseCase:  reassignReviewerUC,
+		GetReviewerPRsUseCase:    getReviewerPRsUC,
 		Logger:                   logger,
 	})
 

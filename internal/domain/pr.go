@@ -50,3 +50,30 @@ func (pr *PullRequest) AddReviewer(reviewerID string) error {
 	pr.NeedMoreReviewers = len(pr.Reviewers) < 2
 	return nil
 }
+
+func (pr *PullRequest) ReplaceReviewer(oldReviewerID, newReviewerID string) error {
+	if pr.Status == "MERGED" {
+		return ErrPullRequestMerged
+	}
+	if newReviewerID == pr.AuthorID {
+		return ErrReviewerIsAuthor
+	}
+	found := false
+	for _, existing := range pr.Reviewers {
+		if existing == newReviewerID {
+			return ErrReviewerAlreadyAdded
+		}
+	}
+	for i, existing := range pr.Reviewers {
+		if existing == oldReviewerID {
+			pr.Reviewers[i] = newReviewerID
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ErrReviewerNotAssigned
+	}
+	pr.NeedMoreReviewers = len(pr.Reviewers) < 2
+	return nil
+}

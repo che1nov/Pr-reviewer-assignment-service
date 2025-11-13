@@ -26,6 +26,7 @@ type RouterConfig struct {
 	ListPullRequestsUseCase  *usecases.ListPullRequestsUseCase
 	MergePullRequestUseCase  *usecases.MergePullRequestUseCase
 	AssignReviewerUseCase    *usecases.AssignReviewerUseCase
+	ReassignReviewerUseCase  *usecases.ReassignReviewerUseCase
 	GetReviewerPRsUseCase    *usecases.GetReviewerPullRequestsUseCase
 	Logger                   *slog.Logger
 }
@@ -365,6 +366,70 @@ func NewRouter(cfg RouterConfig) http.Handler {
 					w.WriteHeader(http.StatusConflict)
 				default:
 					cfg.Logger.Error("failed to assign reviewer", "error", err)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(dto.PullRequestOutput{
+				ID:                updated.ID,
+				Title:             updated.Title,
+				AuthorID:          updated.AuthorID,
+				TeamName:          updated.TeamName,
+				Reviewers:         updated.Reviewers,
+				Status:            updated.Status,
+				NeedMoreReviewers: updated.NeedMoreReviewers,
+			})
+		})
+	}
+
+	if cfg.ReassignReviewerUseCase != nil {
+		r.Post("/pull-requests/{id}/reviewers/reassign", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			var payload struct {
+				OldReviewerID string `json:"old_reviewer_id"`
+				NewReviewerID string `json:"new_reviewer_id"`
+			}
+
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				cfg.Logger.Error("failed to decode reassign payload", "error", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			if payload.OldReviewerID == "" || payload.NewReviewerID == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			updated, err := cfg.ReassignReviewerUseCase.Execute(r.Context(), id, payload.OldReviewerID, payload.NewReviewerID)
+			if err != nil {
+				switch {
+				case errors.Is(err, domain.ErrPullRequestNotFound):
+					w.WriteHeader(http.StatusNotFound)
+				case errors.Is(err, domain.ErrTeamNotFound):
+					w.WriteHeader(http.StatusBadRequest)
+				case errors.Is(err, domain.ErrReviewerNotAssigned):
+					w.WriteHeader(http.StatusNotFound)
+				case errors.Is(err, domain.ErrReviewerInactive):
+					w.WriteHeader(http.StatusConflict)
+				case errors.Is(err, domain.ErrReviewerNotInTeam):
+					w.WriteHeader(http.StatusBadRequest)
+				case errors.Is(err, domain.ErrReviewerIsAuthor):
+					w.WriteHeader(http.StatusConflict)
+				case errors.Is(err, domain.ErrReviewerAlreadyAdded):
+					w.WriteHeader(http.StatusConflict)
+				case errors.Is(err, domain.ErrPullRequestMerged):
+					w.WriteHeader(http.StatusConflict)
+				default:
+					cfg.Logger.Error("failed to reassign reviewer", "error", err)
 					w.WriteHeader(http.StatusInternalServerError)
 				}
 				return

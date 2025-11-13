@@ -11,5 +11,6 @@ var (
 	ErrReviewerNotInTeam    = errors.New("reviewer not in team")
 	ErrReviewerIsAuthor     = errors.New("reviewer is author")
 	ErrReviewerLimitReached = errors.New("reviewer limit reached")
+	ErrReviewerNotAssigned  = errors.New("reviewer not assigned")
 	ErrUserNotFound         = errors.New("user not found")
 )
