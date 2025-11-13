@@ -24,7 +24,7 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 	listUsersUC := usecases.NewListUsersUseCase(userStorage)
 	createTeamUC := usecases.NewCreateTeamUseCase(userStorage, userStorage)
 	listTeamsUC := usecases.NewListTeamsUseCase(userStorage)
-	createPRUC := usecases.NewCreatePullRequestUseCase(userStorage)
+	createPRUC := usecases.NewCreatePullRequestUseCase(userStorage, userStorage)
 	listPRsUC := usecases.NewListPullRequestsUseCase(userStorage)
 
 	router := httpcontroller.NewRouter(httpcontroller.RouterConfig{

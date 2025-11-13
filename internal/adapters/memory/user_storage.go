@@ -60,6 +60,17 @@ func (s *UserStorage) ListTeams(_ context.Context) ([]domain.Team, error) {
 	return teams, nil
 }
 
+func (s *UserStorage) GetTeam(_ context.Context, name string) (domain.Team, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	team, ok := s.teams[name]
+	if !ok {
+		return domain.Team{}, domain.ErrTeamNotFound
+	}
+	return team, nil
+}
+
 func (s *UserStorage) CreatePullRequest(_ context.Context, pr domain.PullRequest) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

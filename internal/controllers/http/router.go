@@ -165,12 +165,13 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			response := make([]dto.PullRequestOutput, 0, len(prs))
 			for _, pr := range prs {
 				response = append(response, dto.PullRequestOutput{
-					ID:        pr.ID,
-					Title:     pr.Title,
-					AuthorID:  pr.AuthorID,
-					TeamName:  pr.TeamName,
-					Reviewers: pr.Reviewers,
-					Status:    pr.Status,
+					ID:                pr.ID,
+					Title:             pr.Title,
+					AuthorID:          pr.AuthorID,
+					TeamName:          pr.TeamName,
+					Reviewers:         pr.Reviewers,
+					Status:            pr.Status,
+					NeedMoreReviewers: pr.NeedMoreReviewers,
 				})
 			}
 
@@ -196,21 +197,26 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				return
 			}
 
-			pr := domain.NewPullRequest(
-				input.ID,
-				input.Title,
-				input.AuthorID,
-				input.TeamName,
-				input.Reviewers,
-			)
+			pr := domain.NewPullRequest(input.ID, input.Title, input.AuthorID, input.TeamName)
 
-			if err := cfg.CreatePullRequestUseCase.Execute(r.Context(), pr); err != nil {
+			created, err := cfg.CreatePullRequestUseCase.Execute(r.Context(), pr)
+			if err != nil {
 				cfg.Logger.Error("failed to create pull request", "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(dto.PullRequestOutput{
+				ID:                created.ID,
+				Title:             created.Title,
+				AuthorID:          created.AuthorID,
+				TeamName:          created.TeamName,
+				Reviewers:         created.Reviewers,
+				Status:            created.Status,
+				NeedMoreReviewers: created.NeedMoreReviewers,
+			})
 		})
 	}
 

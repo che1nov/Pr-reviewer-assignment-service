@@ -14,6 +14,7 @@ type UserStorage interface {
 type TeamStorage interface {
 	CreateTeam(ctx context.Context, team domain.Team) error
 	ListTeams(ctx context.Context) ([]domain.Team, error)
+	GetTeam(ctx context.Context, name string) (domain.Team, error)
 }
 
 type PullRequestStorage interface {
