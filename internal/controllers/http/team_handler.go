@@ -47,7 +47,7 @@ func (h *TeamHandler) AddTeam(w http.ResponseWriter, r *http.Request) {
 		members = append(members, domain.NewUser(member.UserID, member.Username, body.TeamName, member.IsActive))
 	}
 
-	team, err := h.addTeamUC.Execute(r.Context(), domain.NewTeam(body.TeamName, members))
+	team, err := h.addTeamUC.Create(r.Context(), domain.NewTeam(body.TeamName, members))
 	if err != nil {
 		status, code, message := mapTeamError(err)
 		h.logger.ErrorContext(r.Context(), "ошибка создания команды", "error", err, "team_name", body.TeamName)
@@ -66,7 +66,7 @@ func (h *TeamHandler) GetTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	team, err := h.getTeamUC.Execute(r.Context(), teamName)
+	team, err := h.getTeamUC.Get(r.Context(), teamName)
 	if err != nil {
 		h.logger.WarnContext(r.Context(), "команда не найдена", "team_name", teamName, "error", err)
 		respondError(h.logger, w, http.StatusNotFound, "NOT_FOUND", err.Error())

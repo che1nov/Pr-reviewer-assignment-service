@@ -8,7 +8,6 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 )
 
-// CreatePullRequestUseCase создаёт pull request и назначает ревьюеров.
 type CreatePullRequestUseCase struct {
 	prs   PullRequestStorage
 	teams TeamStorage
@@ -18,7 +17,6 @@ type CreatePullRequestUseCase struct {
 	log   *slog.Logger
 }
 
-// NewCreatePullRequestUseCase подготавливает use case создания pull request.
 func NewCreatePullRequestUseCase(
 	prStorage PullRequestStorage,
 	teamStorage TeamStorage,
@@ -37,8 +35,8 @@ func NewCreatePullRequestUseCase(
 	}
 }
 
-// Execute создаёт pull request.
-func (uc *CreatePullRequestUseCase) Execute(ctx context.Context, id, title, authorID string) (domain.PullRequest, error) {
+// Create создаёт pull request
+func (uc *CreatePullRequestUseCase) Create(ctx context.Context, id, title, authorID string) (domain.PullRequest, error) {
 	uc.log.InfoContext(ctx, "создаём pull request", "pr_id", id, "author_id", authorID)
 
 	if _, err := uc.prs.GetPullRequest(ctx, id); err == nil {

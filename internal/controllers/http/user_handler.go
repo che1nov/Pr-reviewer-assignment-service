@@ -11,14 +11,12 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/usecases"
 )
 
-// UserHandler обслуживает операции над пользователями.
 type UserHandler struct {
 	logger            *slog.Logger
 	setActiveUseCase  *usecases.SetUserActiveUseCase
 	getReviewsUseCase *usecases.GetReviewerPullRequestsUseCase
 }
 
-// NewUserHandler создаёт обработчик пользователей.
 func NewUserHandler(
 	logger *slog.Logger,
 	setActiveUseCase *usecases.SetUserActiveUseCase,
@@ -43,7 +41,7 @@ func (h *UserHandler) SetActive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.setActiveUseCase.Execute(r.Context(), body.UserID, body.IsActive)
+	user, err := h.setActiveUseCase.SetActive(r.Context(), body.UserID, body.IsActive)
 	if err != nil {
 		status, code, message := mapUserError(err)
 		h.logger.ErrorContext(r.Context(), "ошибка обновления статуса пользователя", "error", err, "user_id", body.UserID)
@@ -62,7 +60,7 @@ func (h *UserHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prs, err := h.getReviewsUseCase.Execute(r.Context(), userID)
+	prs, err := h.getReviewsUseCase.ListByReviewer(r.Context(), userID)
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "ошибка получения pull request пользователя", "error", err, "user_id", userID)
 		respondError(h.logger, w, http.StatusInternalServerError, "INTERNAL", err.Error())

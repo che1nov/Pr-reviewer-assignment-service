@@ -8,14 +8,12 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 )
 
-// CreateTeamUseCase создаёт команду и синхронизирует пользователей.
 type CreateTeamUseCase struct {
 	teams TeamStorage
 	users UserStorage
 	log   *slog.Logger
 }
 
-// NewCreateTeamUseCase подготавливает use case создания команды.
 func NewCreateTeamUseCase(teamStorage TeamStorage, userStorage UserStorage, log *slog.Logger) *CreateTeamUseCase {
 	return &CreateTeamUseCase{
 		teams: teamStorage,
@@ -24,8 +22,8 @@ func NewCreateTeamUseCase(teamStorage TeamStorage, userStorage UserStorage, log 
 	}
 }
 
-// Execute создаёт новую команду и обновляет участников.
-func (uc *CreateTeamUseCase) Execute(ctx context.Context, team domain.Team) (domain.Team, error) {
+// Create создаёт новую команду и обновляет участников
+func (uc *CreateTeamUseCase) Create(ctx context.Context, team domain.Team) (domain.Team, error) {
 	uc.log.InfoContext(ctx, "создаём команду", "team_name", team.Name)
 
 	if _, err := uc.teams.GetTeam(ctx, team.Name); err == nil {

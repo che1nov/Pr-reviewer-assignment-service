@@ -44,7 +44,7 @@ func (h *PullRequestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pr, err := h.createPRUseCase.Execute(r.Context(), body.PullRequestID, body.PullRequestName, body.AuthorID)
+	pr, err := h.createPRUseCase.Create(r.Context(), body.PullRequestID, body.PullRequestName, body.AuthorID)
 	if err != nil {
 		status, code, message := mapCreatePRError(err)
 		h.logger.ErrorContext(r.Context(), "ошибка создания pull request", "error", err, "pr_id", body.PullRequestID)
@@ -67,7 +67,7 @@ func (h *PullRequestHandler) Merge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pr, err := h.mergePRUseCase.Execute(r.Context(), body.PullRequestID)
+	pr, err := h.mergePRUseCase.Merge(r.Context(), body.PullRequestID)
 	if err != nil {
 		status, code, message := mapMergePRError(err)
 		h.logger.ErrorContext(r.Context(), "ошибка merge pull request", "error", err, "pr_id", body.PullRequestID)
@@ -90,7 +90,7 @@ func (h *PullRequestHandler) Reassign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pr, replacedBy, err := h.reassignPRUseCase.Execute(r.Context(), body.PullRequestID, body.OldReviewerID, body.NewReviewerID)
+	pr, replacedBy, err := h.reassignPRUseCase.Reassign(r.Context(), body.PullRequestID, body.OldReviewerID, body.NewReviewerID)
 	if err != nil {
 		status, code, message := mapReassignPRError(err)
 		h.logger.ErrorContext(r.Context(), "ошибка переназначения ревьюера", "error", err, "pr_id", body.PullRequestID, "old_reviewer", body.OldReviewerID)

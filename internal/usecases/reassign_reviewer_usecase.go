@@ -8,7 +8,6 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 )
 
-// ReassignReviewerUseCase переназначает ревьюера на pull request.
 type ReassignReviewerUseCase struct {
 	prs   PullRequestStorage
 	teams TeamStorage
@@ -17,7 +16,6 @@ type ReassignReviewerUseCase struct {
 	log   *slog.Logger
 }
 
-// NewReassignReviewerUseCase создаёт use case переназначения ревьюера.
 func NewReassignReviewerUseCase(
 	prStorage PullRequestStorage,
 	teamStorage TeamStorage,
@@ -34,8 +32,8 @@ func NewReassignReviewerUseCase(
 	}
 }
 
-// Execute переназначает ревьюера. Возвращает новый состав и идентификатор заменяющего.
-func (uc *ReassignReviewerUseCase) Execute(ctx context.Context, prID, oldReviewerID string, desiredNew *string) (domain.PullRequest, string, error) {
+// Reassign переназначает ревьюера. Возвращает новый состав и идентификатор заменяющего
+func (uc *ReassignReviewerUseCase) Reassign(ctx context.Context, prID, oldReviewerID string, desiredNew *string) (domain.PullRequest, string, error) {
 	uc.log.InfoContext(ctx, "переназначаем ревьюера", "pr_id", prID, "old_reviewer", oldReviewerID)
 
 	pr, err := uc.prs.GetPullRequest(ctx, prID)

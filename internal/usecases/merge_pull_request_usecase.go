@@ -7,14 +7,12 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 )
 
-// MergePullRequestUseCase помечает pull request как MERGED.
 type MergePullRequestUseCase struct {
 	prs   PullRequestStorage
 	clock ClockAdapter
 	log   *slog.Logger
 }
 
-// NewMergePullRequestUseCase создаёт use case merge pull request.
 func NewMergePullRequestUseCase(prStorage PullRequestStorage, clock ClockAdapter, log *slog.Logger) *MergePullRequestUseCase {
 	return &MergePullRequestUseCase{
 		prs:   prStorage,
@@ -23,8 +21,8 @@ func NewMergePullRequestUseCase(prStorage PullRequestStorage, clock ClockAdapter
 	}
 }
 
-// Execute выполняет merge, операция идемпотентна.
-func (uc *MergePullRequestUseCase) Execute(ctx context.Context, id string) (domain.PullRequest, error) {
+// Merge выполняет merge, операция идемпотентна
+func (uc *MergePullRequestUseCase) Merge(ctx context.Context, id string) (domain.PullRequest, error) {
 	uc.log.InfoContext(ctx, "merge pull request", "pr_id", id)
 
 	pr, err := uc.prs.GetPullRequest(ctx, id)
