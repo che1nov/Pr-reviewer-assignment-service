@@ -20,7 +20,11 @@ func main() {
 	cfg := config.Load()
 	log := logger.New(logger.Config{Level: cfg.LogLevel})
 
-	application := app.New(cfg, log)
+	application, err := app.New(cfg, log)
+	if err != nil {
+		log.Error("failed to init application", "error", err)
+		return
+	}
 
 	go func() {
 		<-ctx.Done()

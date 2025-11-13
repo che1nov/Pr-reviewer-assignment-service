@@ -1,0 +1,43 @@
+services:
+  postgresql:
+    image: postgres:17
+    container_name: pr-reviewer-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pr_service
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d pr_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: pr-reviewer-app
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      HTTP_PORT: "8080"
+      LOG_LEVEL: "info"
+      ADMIN_TOKEN: "admin-secret"
+      USER_TOKEN: "user-secret"
+      DATABASE_URL: "postgres://app:app@postgresql:5432/pr_service?sslmode=disable"
+    ports:
+      - "8080:8080"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        until pg_isready -h postgresql -p 5432 -U app; do sleep 1; done
+        exec /app/service
+
+volumes:
+  postgres-data: {}
+

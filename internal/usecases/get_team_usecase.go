@@ -19,7 +19,7 @@ func NewGetTeamUseCase(teamStorage TeamStorage, log *slog.Logger) *GetTeamUseCas
 	}
 }
 
-// Get находит команду
+// Get находит команду.
 func (uc *GetTeamUseCase) Get(ctx context.Context, name string) (domain.Team, error) {
 	uc.log.InfoContext(ctx, "получаем команду", "team_name", name)
 

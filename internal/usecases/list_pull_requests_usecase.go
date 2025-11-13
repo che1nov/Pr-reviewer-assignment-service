@@ -7,25 +7,25 @@ import (
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
 )
 
-type GetReviewerPullRequestsUseCase struct {
+type ListPullRequestsUseCase struct {
 	prs PullRequestStorage
 	log *slog.Logger
 }
 
-func NewGetReviewerPullRequestsUseCase(storage PullRequestStorage, log *slog.Logger) *GetReviewerPullRequestsUseCase {
-	return &GetReviewerPullRequestsUseCase{
+func NewListPullRequestsUseCase(storage PullRequestStorage, log *slog.Logger) *ListPullRequestsUseCase {
+	return &ListPullRequestsUseCase{
 		prs: storage,
 		log: log,
 	}
 }
 
-// ListByReviewer отдаёт pull request пользователя
-func (uc *GetReviewerPullRequestsUseCase) ListByReviewer(ctx context.Context, reviewerID string) ([]domain.PullRequest, error) {
-	uc.log.InfoContext(ctx, "получаем pull request для ревьюера", "reviewer_id", reviewerID)
+// List возвращает все pull request.
+func (uc *ListPullRequestsUseCase) List(ctx context.Context) ([]domain.PullRequest, error) {
+	uc.log.InfoContext(ctx, "получаем список pull request")
 
-	prs, err := uc.prs.ListPullRequestsByReviewer(ctx, reviewerID)
+	prs, err := uc.prs.ListPullRequests(ctx)
 	if err != nil {
-		uc.log.ErrorContext(ctx, "ошибка выборки pull request", "error", err, "reviewer_id", reviewerID)
+		uc.log.ErrorContext(ctx, "ошибка выборки pull request", "error", err)
 		return nil, err
 	}
 

@@ -21,7 +21,7 @@ func NewMergePullRequestUseCase(prStorage PullRequestStorage, clock ClockAdapter
 	}
 }
 
-// Merge выполняет merge, операция идемпотентна
+// Merge выполняет merge.
 func (uc *MergePullRequestUseCase) Merge(ctx context.Context, id string) (domain.PullRequest, error) {
 	uc.log.InfoContext(ctx, "merge pull request", "pr_id", id)
 

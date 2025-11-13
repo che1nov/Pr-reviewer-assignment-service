@@ -19,7 +19,7 @@ func NewSetUserActiveUseCase(storage UserStorage, log *slog.Logger) *SetUserActi
 	}
 }
 
-// SetActive включает или выключает пользователя
+// SetActive включает или выключает пользователя.
 func (uc *SetUserActiveUseCase) SetActive(ctx context.Context, id string, isActive bool) (domain.User, error) {
 	uc.log.InfoContext(ctx, "изменяем активность пользователя", "user_id", id, "is_active", isActive)
 

@@ -35,7 +35,7 @@ func NewCreatePullRequestUseCase(
 	}
 }
 
-// Create создаёт pull request
+// Create создаёт pull request.
 func (uc *CreatePullRequestUseCase) Create(ctx context.Context, id, title, authorID string) (domain.PullRequest, error) {
 	uc.log.InfoContext(ctx, "создаём pull request", "pr_id", id, "author_id", authorID)
 
@@ -65,22 +65,24 @@ func (uc *CreatePullRequestUseCase) Create(ctx context.Context, id, title, autho
 
 	candidates := team.ActiveReviewersExcluding(authorID)
 	if len(candidates) == 0 {
-		uc.log.WarnContext(ctx, "нет кандидатов в ревьюеры", "pr_id", id, "team_name", team.Name)
-		return domain.PullRequest{}, domain.ErrNoReviewerCandidates
+		uc.log.WarnContext(ctx, "нет активных кандидатов в ревьюеры", "pr_id", id, "team_name", team.Name)
 	}
 
-	if uc.rand != nil && len(candidates) > 1 {
-		uc.rand.Shuffle(len(candidates), func(i, j int) {
-			candidates[i], candidates[j] = candidates[j], candidates[i]
-		})
+	selected := candidates
+	if len(selected) > 0 {
+		if uc.rand != nil && len(selected) > 1 {
+			uc.rand.Shuffle(len(selected), func(i, j int) {
+				selected[i], selected[j] = selected[j], selected[i]
+			})
+		}
+
+		if len(selected) > 2 {
+			selected = selected[:2]
+		}
 	}
 
-	if len(candidates) > 2 {
-		candidates = candidates[:2]
-	}
-
-	reviewerIDs := make([]string, 0, len(candidates))
-	for _, reviewer := range candidates {
+	reviewerIDs := make([]string, 0, len(selected))
+	for _, reviewer := range selected {
 		reviewerIDs = append(reviewerIDs, reviewer.ID)
 	}
 

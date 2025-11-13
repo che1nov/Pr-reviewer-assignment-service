@@ -1,10 +1,10 @@
 package domain
 
 type User struct {
-	ID       string
-	Name     string
-	TeamName string
-	IsActive bool
+	ID       string `db:"id"`
+	Name     string `db:"name"`
+	TeamName string `db:"team_name"`
+	IsActive bool   `db:"is_active"`
 }
 
 // NewUser создаёт пользователя с привязкой к команде.

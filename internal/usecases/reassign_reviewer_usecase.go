@@ -32,7 +32,7 @@ func NewReassignReviewerUseCase(
 	}
 }
 
-// Reassign переназначает ревьюера. Возвращает новый состав и идентификатор заменяющего
+// Reassign переназначает ревьюера и возвращает идентификатор заменяющего.
 func (uc *ReassignReviewerUseCase) Reassign(ctx context.Context, prID, oldReviewerID string, desiredNew *string) (domain.PullRequest, string, error) {
 	uc.log.InfoContext(ctx, "переназначаем ревьюера", "pr_id", prID, "old_reviewer", oldReviewerID)
 

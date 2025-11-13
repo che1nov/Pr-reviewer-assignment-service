@@ -22,7 +22,7 @@ func NewCreateTeamUseCase(teamStorage TeamStorage, userStorage UserStorage, log 
 	}
 }
 
-// Create создаёт новую команду и обновляет участников
+// Create создаёт новую команду и обновляет участников.
 func (uc *CreateTeamUseCase) Create(ctx context.Context, team domain.Team) (domain.Team, error) {
 	uc.log.InfoContext(ctx, "создаём команду", "team_name", team.Name)
 
