@@ -14,12 +14,14 @@ import (
 )
 
 type RouterConfig struct {
-	Message           string
-	CreateUserUseCase *usecases.CreateUserUseCase
-	ListUsersUseCase  *usecases.ListUsersUseCase
-	CreateTeamUseCase *usecases.CreateTeamUseCase
-	ListTeamsUseCase  *usecases.ListTeamsUseCase
-	Logger            *slog.Logger
+	Message                  string
+	CreateUserUseCase        *usecases.CreateUserUseCase
+	ListUsersUseCase         *usecases.ListUsersUseCase
+	CreateTeamUseCase        *usecases.CreateTeamUseCase
+	ListTeamsUseCase         *usecases.ListTeamsUseCase
+	CreatePullRequestUseCase *usecases.CreatePullRequestUseCase
+	ListPullRequestsUseCase  *usecases.ListPullRequestsUseCase
+	Logger                   *slog.Logger
 }
 
 func NewRouter(cfg RouterConfig) http.Handler {
@@ -143,6 +145,67 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			team := domain.NewTeam(input.Name, users)
 			if err := cfg.CreateTeamUseCase.Execute(r.Context(), team); err != nil {
 				cfg.Logger.Error("failed to create team", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusCreated)
+		})
+	}
+
+	if cfg.ListPullRequestsUseCase != nil {
+		r.Get("/pull-requests", func(w http.ResponseWriter, r *http.Request) {
+			prs, err := cfg.ListPullRequestsUseCase.Execute(r.Context())
+			if err != nil {
+				cfg.Logger.Error("failed to list pull requests", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			response := make([]dto.PullRequestOutput, 0, len(prs))
+			for _, pr := range prs {
+				response = append(response, dto.PullRequestOutput{
+					ID:        pr.ID,
+					Title:     pr.Title,
+					AuthorID:  pr.AuthorID,
+					TeamName:  pr.TeamName,
+					Reviewers: pr.Reviewers,
+					Status:    pr.Status,
+				})
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				cfg.Logger.Error("failed to encode pull requests", "error", err)
+			}
+		})
+	}
+
+	if cfg.CreatePullRequestUseCase != nil {
+		r.Post("/pull-requests", func(w http.ResponseWriter, r *http.Request) {
+			var input dto.CreatePullRequestInput
+			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+				cfg.Logger.Error("failed to decode pull request", "error", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			if input.ID == "" || input.Title == "" || input.AuthorID == "" || input.TeamName == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			pr := domain.NewPullRequest(
+				input.ID,
+				input.Title,
+				input.AuthorID,
+				input.TeamName,
+				input.Reviewers,
+			)
+
+			if err := cfg.CreatePullRequestUseCase.Execute(r.Context(), pr); err != nil {
+				cfg.Logger.Error("failed to create pull request", "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}

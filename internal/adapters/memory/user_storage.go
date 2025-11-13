@@ -11,12 +11,14 @@ type UserStorage struct {
 	mu    sync.RWMutex
 	users map[string]string
 	teams map[string]domain.Team
+	prs   map[string]domain.PullRequest
 }
 
 func NewUserStorage() *UserStorage {
 	return &UserStorage{
 		users: make(map[string]string),
 		teams: make(map[string]domain.Team),
+		prs:   make(map[string]domain.PullRequest),
 	}
 }
 
@@ -56,4 +58,23 @@ func (s *UserStorage) ListTeams(_ context.Context) ([]domain.Team, error) {
 	}
 
 	return teams, nil
+}
+
+func (s *UserStorage) CreatePullRequest(_ context.Context, pr domain.PullRequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.prs[pr.ID] = pr
+	return nil
+}
+
+func (s *UserStorage) ListPullRequests(_ context.Context) ([]domain.PullRequest, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	prs := make([]domain.PullRequest, 0, len(s.prs))
+	for _, pr := range s.prs {
+		prs = append(prs, pr)
+	}
+
+	return prs, nil
 }

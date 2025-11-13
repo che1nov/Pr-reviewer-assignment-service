@@ -24,14 +24,18 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 	listUsersUC := usecases.NewListUsersUseCase(userStorage)
 	createTeamUC := usecases.NewCreateTeamUseCase(userStorage, userStorage)
 	listTeamsUC := usecases.NewListTeamsUseCase(userStorage)
+	createPRUC := usecases.NewCreatePullRequestUseCase(userStorage)
+	listPRsUC := usecases.NewListPullRequestsUseCase(userStorage)
 
 	router := httpcontroller.NewRouter(httpcontroller.RouterConfig{
-		Message:           cfg.Message,
-		CreateUserUseCase: createUserUC,
-		ListUsersUseCase:  listUsersUC,
-		CreateTeamUseCase: createTeamUC,
-		ListTeamsUseCase:  listTeamsUC,
-		Logger:            logger,
+		Message:                  cfg.Message,
+		CreateUserUseCase:        createUserUC,
+		ListUsersUseCase:         listUsersUC,
+		CreateTeamUseCase:        createTeamUC,
+		ListTeamsUseCase:         listTeamsUC,
+		CreatePullRequestUseCase: createPRUC,
+		ListPullRequestsUseCase:  listPRsUC,
+		Logger:                   logger,
 	})
 
 	server := &http.Server{
