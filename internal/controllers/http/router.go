@@ -23,6 +23,7 @@ type RouterConfig struct {
 	CreatePullRequestUseCase *usecases.CreatePullRequestUseCase
 	ListPullRequestsUseCase  *usecases.ListPullRequestsUseCase
 	MergePullRequestUseCase  *usecases.MergePullRequestUseCase
+	AssignReviewerUseCase    *usecases.AssignReviewerUseCase
 	Logger                   *slog.Logger
 }
 
@@ -251,6 +252,61 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				Reviewers:         merged.Reviewers,
 				Status:            merged.Status,
 				NeedMoreReviewers: merged.NeedMoreReviewers,
+			})
+		})
+	}
+
+	if cfg.AssignReviewerUseCase != nil {
+		r.Post("/pull-requests/{id}/reviewers", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			var payload struct {
+				UserID string `json:"user_id"`
+			}
+
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				cfg.Logger.Error("failed to decode reviewer payload", "error", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			if payload.UserID == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			updated, err := cfg.AssignReviewerUseCase.Execute(r.Context(), id, payload.UserID)
+			if err != nil {
+				switch {
+				case errors.Is(err, domain.ErrPullRequestNotFound):
+					w.WriteHeader(http.StatusNotFound)
+				case errors.Is(err, domain.ErrTeamNotFound):
+					w.WriteHeader(http.StatusBadRequest)
+				case errors.Is(err, domain.ErrReviewerAlreadyAdded):
+					w.WriteHeader(http.StatusConflict)
+				case errors.Is(err, domain.ErrPullRequestMerged):
+					w.WriteHeader(http.StatusConflict)
+				default:
+					cfg.Logger.Error("failed to assign reviewer", "error", err)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(dto.PullRequestOutput{
+				ID:                updated.ID,
+				Title:             updated.Title,
+				AuthorID:          updated.AuthorID,
+				TeamName:          updated.TeamName,
+				Reviewers:         updated.Reviewers,
+				Status:            updated.Status,
+				NeedMoreReviewers: updated.NeedMoreReviewers,
 			})
 		})
 	}

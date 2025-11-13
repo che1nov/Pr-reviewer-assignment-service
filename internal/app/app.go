@@ -27,6 +27,7 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 	createPRUC := usecases.NewCreatePullRequestUseCase(userStorage, userStorage)
 	listPRsUC := usecases.NewListPullRequestsUseCase(userStorage)
 	mergePRUC := usecases.NewMergePullRequestUseCase(userStorage)
+	assignReviewerUC := usecases.NewAssignReviewerUseCase(userStorage, userStorage)
 
 	router := httpcontroller.NewRouter(httpcontroller.RouterConfig{
 		Message:                  cfg.Message,
@@ -37,6 +38,7 @@ func New(cfg config.Config, logger *slog.Logger) *App {
 		CreatePullRequestUseCase: createPRUC,
 		ListPullRequestsUseCase:  listPRsUC,
 		MergePullRequestUseCase:  mergePRUC,
+		AssignReviewerUseCase:    assignReviewerUC,
 		Logger:                   logger,
 	})
 

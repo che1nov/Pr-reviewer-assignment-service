@@ -30,3 +30,23 @@ func (pr *PullRequest) AssignReviewers(reviewers []string) {
 func (pr *PullRequest) MarkMerged() {
 	pr.Status = "MERGED"
 }
+
+func (pr *PullRequest) AddReviewer(reviewerID string) error {
+	if pr.Status == "MERGED" {
+		return ErrPullRequestMerged
+	}
+	if reviewerID == pr.AuthorID {
+		return ErrReviewerAlreadyAdded
+	}
+	for _, existing := range pr.Reviewers {
+		if existing == reviewerID {
+			return ErrReviewerAlreadyAdded
+		}
+	}
+	if len(pr.Reviewers) >= 2 {
+		return ErrReviewerAlreadyAdded
+	}
+	pr.Reviewers = append(pr.Reviewers, reviewerID)
+	pr.NeedMoreReviewers = len(pr.Reviewers) < 2
+	return nil
+}
