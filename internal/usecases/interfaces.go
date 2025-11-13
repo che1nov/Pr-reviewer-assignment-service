@@ -20,4 +20,6 @@ type TeamStorage interface {
 type PullRequestStorage interface {
 	CreatePullRequest(ctx context.Context, pr domain.PullRequest) error
 	ListPullRequests(ctx context.Context) ([]domain.PullRequest, error)
+	GetPullRequest(ctx context.Context, id string) (domain.PullRequest, error)
+	UpdatePullRequest(ctx context.Context, pr domain.PullRequest) error
 }

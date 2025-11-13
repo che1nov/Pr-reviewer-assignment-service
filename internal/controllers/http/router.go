@@ -2,6 +2,7 @@ package httpcontroller
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -21,6 +22,7 @@ type RouterConfig struct {
 	ListTeamsUseCase         *usecases.ListTeamsUseCase
 	CreatePullRequestUseCase *usecases.CreatePullRequestUseCase
 	ListPullRequestsUseCase  *usecases.ListPullRequestsUseCase
+	MergePullRequestUseCase  *usecases.MergePullRequestUseCase
 	Logger                   *slog.Logger
 }
 
@@ -216,6 +218,39 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				Reviewers:         created.Reviewers,
 				Status:            created.Status,
 				NeedMoreReviewers: created.NeedMoreReviewers,
+			})
+		})
+	}
+
+	if cfg.MergePullRequestUseCase != nil {
+		r.Post("/pull-requests/{id}/merge", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+			if id == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			merged, err := cfg.MergePullRequestUseCase.Execute(r.Context(), id)
+			if err != nil {
+				if errors.Is(err, domain.ErrPullRequestNotFound) {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				cfg.Logger.Error("failed to merge pull request", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(dto.PullRequestOutput{
+				ID:                merged.ID,
+				Title:             merged.Title,
+				AuthorID:          merged.AuthorID,
+				TeamName:          merged.TeamName,
+				Reviewers:         merged.Reviewers,
+				Status:            merged.Status,
+				NeedMoreReviewers: merged.NeedMoreReviewers,
 			})
 		})
 	}

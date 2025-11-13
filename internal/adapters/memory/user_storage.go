@@ -89,3 +89,24 @@ func (s *UserStorage) ListPullRequests(_ context.Context) ([]domain.PullRequest,
 
 	return prs, nil
 }
+
+func (s *UserStorage) GetPullRequest(_ context.Context, id string) (domain.PullRequest, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	pr, ok := s.prs[id]
+	if !ok {
+		return domain.PullRequest{}, domain.ErrPullRequestNotFound
+	}
+	return pr, nil
+}
+
+func (s *UserStorage) UpdatePullRequest(_ context.Context, pr domain.PullRequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.prs[pr.ID]; !ok {
+		return domain.ErrPullRequestNotFound
+	}
+	s.prs[pr.ID] = pr
+	return nil
+}

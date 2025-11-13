@@ -26,3 +26,7 @@ func (pr *PullRequest) AssignReviewers(reviewers []string) {
 	pr.Reviewers = reviewers
 	pr.NeedMoreReviewers = len(reviewers) < 2
 }
+
+func (pr *PullRequest) MarkMerged() {
+	pr.Status = "MERGED"
+}
