@@ -42,9 +42,17 @@ func (uc *ReassignReviewerUseCase) Reassign(ctx context.Context, prID, oldReview
 		return domain.PullRequest{}, "", err
 	}
 
-	team, err := uc.teams.GetTeam(ctx, pr.TeamName)
+	// Получаем заменяемого ревьювера
+	oldReviewer, err := uc.users.GetUser(ctx, oldReviewerID)
 	if err != nil {
-		uc.log.WarnContext(ctx, "команда не найдена при переназначении", "team_name", pr.TeamName, "error", err)
+		uc.log.WarnContext(ctx, "заменяемый ревьювер не найден", "reviewer_id", oldReviewerID, "error", err)
+		return domain.PullRequest{}, "", err
+	}
+
+	// Получаем команду заменяемого ревьювера (согласно OpenAPI: "из его команды")
+	team, err := uc.teams.GetTeam(ctx, oldReviewer.TeamName)
+	if err != nil {
+		uc.log.WarnContext(ctx, "команда заменяемого ревьювера не найдена", "team_name", oldReviewer.TeamName, "error", err)
 		return domain.PullRequest{}, "", err
 	}
 

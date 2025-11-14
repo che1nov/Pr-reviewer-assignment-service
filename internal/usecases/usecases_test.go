@@ -375,7 +375,7 @@ func TestReassignReviewerUseCase_Reassign(t *testing.T) {
 				domain.NewUser("busy", "Busy", "backend", true),
 				domain.NewUser("candidate", "Charlie", "backend", true),
 			})),
-			users: newFakeUserStorage(domain.NewUser("candidate", "Charlie", "backend", true)),
+			users: newFakeUserStorage(oldReviewer, domain.NewUser("candidate", "Charlie", "backend", true)),
 			verify: func(t *testing.T, pr domain.PullRequest, replacedBy string) {
 				t.Helper()
 				if replacedBy == "" || replacedBy == "old" {
@@ -390,7 +390,7 @@ func TestReassignReviewerUseCase_Reassign(t *testing.T) {
 			name:    "pull request not found",
 			prStore: newFakePullRequestStorage(),
 			team:    newFakeTeamStorage(domain.NewTeam("backend", []domain.User{author, oldReviewer})),
-			users:   newFakeUserStorage(),
+			users:   newFakeUserStorage(oldReviewer),
 			wantErr: domain.ErrPullRequestNotFound,
 		},
 		{
@@ -401,7 +401,7 @@ func TestReassignReviewerUseCase_Reassign(t *testing.T) {
 				return pr
 			}()),
 			team:    newFakeTeamStorage(domain.NewTeam("backend", []domain.User{author, oldReviewer})),
-			users:   newFakeUserStorage(),
+			users:   newFakeUserStorage(oldReviewer),
 			wantErr: domain.ErrNoReviewerCandidates,
 		},
 		{
@@ -416,7 +416,7 @@ func TestReassignReviewerUseCase_Reassign(t *testing.T) {
 				oldReviewer,
 				domain.NewUser("candidate", "Charlie", "backend", true),
 			})),
-			users:   newFakeUserStorage(),
+			users:   newFakeUserStorage(oldReviewer),
 			wantErr: domain.ErrUserNotFound,
 		},
 		{
@@ -431,7 +431,7 @@ func TestReassignReviewerUseCase_Reassign(t *testing.T) {
 				oldReviewer,
 				domain.NewUser("inactive", "Charlie", "backend", false),
 			})),
-			users:      newFakeUserStorage(),
+			users:      newFakeUserStorage(oldReviewer),
 			desiredNew: stringPtr("inactive"),
 			wantErr:    domain.ErrNoReviewerCandidates,
 		},
@@ -448,7 +448,7 @@ func TestReassignReviewerUseCase_Reassign(t *testing.T) {
 				domain.NewUser("busy", "Busy", "backend", true),
 				domain.NewUser("candidate", "Charlie", "backend", true),
 			})),
-			users:      newFakeUserStorage(domain.NewUser("candidate", "Charlie", "backend", true)),
+			users:      newFakeUserStorage(oldReviewer, domain.NewUser("candidate", "Charlie", "backend", true)),
 			desiredNew: stringPtr("candidate"),
 			verify: func(t *testing.T, pr domain.PullRequest, replacedBy string) {
 				t.Helper()
@@ -473,7 +473,7 @@ func TestReassignReviewerUseCase_Reassign(t *testing.T) {
 				domain.NewUser("candidate", "Charlie", "backend", true),
 			})),
 			users: func() *fakeUserStorage {
-				store := newFakeUserStorage(domain.NewUser("candidate", "Charlie", "backend", true))
+				store := newFakeUserStorage(oldReviewer, domain.NewUser("candidate", "Charlie", "backend", true))
 				store.getErr = errUserFetch
 				store.getErrID = "candidate"
 				return store
@@ -497,7 +497,7 @@ func TestReassignReviewerUseCase_Reassign(t *testing.T) {
 				oldReviewer,
 				domain.NewUser("candidate", "Charlie", "backend", true),
 			})),
-			users:   newFakeUserStorage(domain.NewUser("candidate", "Charlie", "backend", true)),
+			users:   newFakeUserStorage(oldReviewer, domain.NewUser("candidate", "Charlie", "backend", true)),
 			wantErr: errUpdatePR,
 		},
 	}
