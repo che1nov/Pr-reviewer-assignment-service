@@ -98,6 +98,11 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}, nil
 }
 
+// Handler для тестирования.
+func (a *App) Handler() http.Handler {
+	return a.server.Handler
+}
+
 // Start запускает HTTP сервер.
 func (a *App) Start() error {
 	a.logger.Info("запускаем HTTP сервер", "addr", a.server.Addr)
