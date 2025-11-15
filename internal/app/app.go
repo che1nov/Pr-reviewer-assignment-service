@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/che1nov/Pr-reviewer-assignment-service/config"
-	"github.com/che1nov/Pr-reviewer-assignment-service/internal/adapters/memory"
 	"github.com/che1nov/Pr-reviewer-assignment-service/internal/adapters/postgresql"
 	httpcontroller "github.com/che1nov/Pr-reviewer-assignment-service/internal/controllers/http"
 	"github.com/che1nov/Pr-reviewer-assignment-service/internal/usecases"
@@ -28,33 +28,24 @@ type App struct {
 
 // New настройка приложения.
 func New(cfg config.Config, logger *slog.Logger) (*App, error) {
-	var (
-		db          *sqlx.DB
-		userStorage usecases.UserStorage
-		teamStorage usecases.TeamStorage
-		prStorage   usecases.PullRequestStorage
-	)
-
-	if cfg.DatabaseURL != "" {
-		connection, err := postgresql.NewConnection(cfg.DatabaseURL, logger)
-		if err != nil {
-			return nil, err
-		}
-		if err := postgresql.RunMigrations(connection.DB, logger); err != nil {
-			_ = connection.Close()
-			return nil, err
-		}
-
-		db = connection
-		userStorage = postgresql.NewUserAdapter(connection, logger)
-		teamStorage = postgresql.NewTeamAdapter(connection, logger)
-		prStorage = postgresql.NewPullRequestAdapter(connection, logger)
-	} else {
-		storage := memory.NewUserStorage(logger)
-		userStorage = storage
-		teamStorage = storage
-		prStorage = storage
+	if cfg.DatabaseURL == "" {
+		return nil, fmt.Errorf("DATABASE_URL обязателен для работы сервиса")
 	}
+
+	connection, err := postgresql.NewConnection(cfg.DatabaseURL, logger)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка подключения к PostgreSQL: %w", err)
+	}
+
+	if err := postgresql.RunMigrations(connection.DB, logger); err != nil {
+		_ = connection.Close()
+		return nil, fmt.Errorf("ошибка применения миграций: %w", err)
+	}
+
+	db := connection
+	userStorage := postgresql.NewUserAdapter(connection, logger)
+	teamStorage := postgresql.NewTeamAdapter(connection, logger)
+	prStorage := postgresql.NewPullRequestAdapter(connection, logger)
 
 	clockAdapter := clock.NewSystem()
 	randomAdapter := random.New(rand.New(rand.NewSource(time.Now().UnixNano())))
