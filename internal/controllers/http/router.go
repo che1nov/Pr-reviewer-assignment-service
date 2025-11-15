@@ -16,13 +16,15 @@ type RouterConfig struct {
 	AdminToken string
 	UserToken  string
 
-	AddTeamUseCase           *usecases.CreateTeamUseCase
-	GetTeamUseCase           *usecases.GetTeamUseCase
-	SetUserActiveUseCase     *usecases.SetUserActiveUseCase
-	CreatePullRequestUseCase *usecases.CreatePullRequestUseCase
-	MergePullRequestUseCase  *usecases.MergePullRequestUseCase
-	ReassignReviewerUseCase  *usecases.ReassignReviewerUseCase
-	GetReviewerPRsUseCase    *usecases.GetReviewerPullRequestsUseCase
+	AddTeamUseCase             *usecases.CreateTeamUseCase
+	GetTeamUseCase             *usecases.GetTeamUseCase
+	SetUserActiveUseCase       *usecases.SetUserActiveUseCase
+	CreatePullRequestUseCase   *usecases.CreatePullRequestUseCase
+	MergePullRequestUseCase    *usecases.MergePullRequestUseCase
+	ReassignReviewerUseCase    *usecases.ReassignReviewerUseCase
+	GetReviewerPRsUseCase      *usecases.GetReviewerPullRequestsUseCase
+	GetStatsUseCase            *usecases.GetStatsUseCase
+	DeactivateTeamUsersUseCase *usecases.DeactivateTeamUsersUseCase
 }
 
 func NewRouter(cfg RouterConfig) http.Handler {
@@ -38,11 +40,14 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	teamHandler := NewTeamHandler(cfg.Logger, cfg.AddTeamUseCase, cfg.GetTeamUseCase)
 	prHandler := NewPullRequestHandler(cfg.Logger, cfg.CreatePullRequestUseCase, cfg.MergePullRequestUseCase, cfg.ReassignReviewerUseCase)
 	userHandler := NewUserHandler(cfg.Logger, cfg.SetUserActiveUseCase, cfg.GetReviewerPRsUseCase)
+	statsHandler := NewStatsHandler(cfg.Logger, cfg.GetStatsUseCase)
+	deactivateHandler := NewDeactivateHandler(cfg.Logger, cfg.DeactivateTeamUsersUseCase)
 
 	r.Group(func(admin chi.Router) {
 		admin.Use(adminAuth(cfg.Logger, cfg.AdminToken))
 
 		admin.Post("/team/add", teamHandler.AddTeam)
+		admin.Post("/team/deactivateUsers", deactivateHandler.DeactivateTeamUsers)
 		admin.Post("/pullRequest/create", prHandler.Create)
 		admin.Post("/pullRequest/merge", prHandler.Merge)
 		admin.Post("/pullRequest/reassign", prHandler.Reassign)
@@ -54,6 +59,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 		user.Get("/team/get", teamHandler.GetTeam)
 		user.Get("/users/getReview", userHandler.GetReviews)
+		user.Get("/stats", statsHandler.GetStats)
 	})
 
 	return r

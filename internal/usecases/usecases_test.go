@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
+	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/dto"
 )
 
 func TestCreateTeamUseCase_Create(t *testing.T) {
@@ -148,21 +149,59 @@ func TestGetTeamUseCase_Get(t *testing.T) {
 
 	ctx := context.Background()
 
+	errStorage := errors.New("storage failure")
+
 	tests := []struct {
 		name         string
 		initialTeams []domain.Team
 		requestName  string
+		configure    func(storage *fakeTeamStorage)
 		wantErr      error
+		verify       func(t *testing.T, team domain.Team)
 	}{
 		{
 			name:         "team found",
 			initialTeams: []domain.Team{domain.NewTeam("backend", nil)},
 			requestName:  "backend",
+			verify: func(t *testing.T, team domain.Team) {
+				t.Helper()
+				if team.Name != "backend" {
+					t.Fatalf("expected team backend, got %s", team.Name)
+				}
+			},
+		},
+		{
+			name: "team found with members",
+			initialTeams: []domain.Team{
+				domain.NewTeam("backend", []domain.User{
+					domain.NewUser("u1", "Alice", "backend", true),
+					domain.NewUser("u2", "Bob", "backend", true),
+				}),
+			},
+			requestName: "backend",
+			verify: func(t *testing.T, team domain.Team) {
+				t.Helper()
+				if team.Name != "backend" {
+					t.Fatalf("expected team backend, got %s", team.Name)
+				}
+				if len(team.Users) != 2 {
+					t.Fatalf("expected 2 members, got %d", len(team.Users))
+				}
+			},
 		},
 		{
 			name:        "team not found",
 			requestName: "unknown",
 			wantErr:     domain.ErrTeamNotFound,
+		},
+		{
+			name:        "storage error",
+			requestName: "backend",
+			configure: func(storage *fakeTeamStorage) {
+				storage.getErr = errStorage
+				storage.getErrName = "backend"
+			},
+			wantErr: errStorage,
 		},
 	}
 
@@ -172,14 +211,17 @@ func TestGetTeamUseCase_Get(t *testing.T) {
 			t.Parallel()
 
 			teamStorage := newFakeTeamStorage(tt.initialTeams...)
+			if tt.configure != nil {
+				tt.configure(teamStorage)
+			}
 			uc := NewGetTeamUseCase(teamStorage, testLogger())
 
 			team, err := uc.Get(ctx, tt.requestName)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("expected %v, got %v", tt.wantErr, err)
 			}
-			if tt.wantErr == nil && team.Name != tt.requestName {
-				t.Fatalf("expected team %q, got %q", tt.requestName, team.Name)
+			if tt.wantErr == nil && tt.verify != nil {
+				tt.verify(t, team)
 			}
 		})
 	}
@@ -267,6 +309,45 @@ func TestCreatePullRequestUseCase_Create(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "only one active candidate assigns one reviewer",
+			users: []domain.User{
+				baseAuthor,
+				domain.NewUser("r1", "Bob", "backend", true),
+			},
+			team: domain.NewTeam("backend", []domain.User{
+				baseAuthor,
+				domain.NewUser("r1", "Bob", "backend", true),
+			}),
+			verify: func(t *testing.T, pr domain.PullRequest, storage *fakePullRequestStorage) {
+				t.Helper()
+				if len(pr.Reviewers) != 1 {
+					t.Fatalf("expected one reviewer, got %v", pr.Reviewers)
+				}
+				if pr.Reviewers[0] != "r1" {
+					t.Fatalf("expected reviewer r1, got %s", pr.Reviewers[0])
+				}
+			},
+		},
+		{
+			name: "all team members inactive except author",
+			users: []domain.User{
+				baseAuthor,
+				domain.NewUser("r1", "Bob", "backend", false),
+				domain.NewUser("r2", "Charlie", "backend", false),
+			},
+			team: domain.NewTeam("backend", []domain.User{
+				baseAuthor,
+				domain.NewUser("r1", "Bob", "backend", false),
+				domain.NewUser("r2", "Charlie", "backend", false),
+			}),
+			verify: func(t *testing.T, pr domain.PullRequest, storage *fakePullRequestStorage) {
+				t.Helper()
+				if len(pr.Reviewers) != 0 {
+					t.Fatalf("expected no reviewers (all inactive), got %v", pr.Reviewers)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -314,6 +395,35 @@ func TestMergePullRequestUseCase_Merge(t *testing.T) {
 				t.Helper()
 				if pr.Status != "MERGED" || pr.MergedAt == nil {
 					t.Fatalf("expected merged pull request, got %#v", pr)
+				}
+				expectedMergedAt := time.Unix(99, 0)
+				if !pr.MergedAt.Equal(expectedMergedAt) {
+					t.Fatalf("expected mergedAt %v, got %v", expectedMergedAt, *pr.MergedAt)
+				}
+			},
+		},
+		{
+			name: "merge already merged PR is idempotent",
+			initialPRs: []domain.PullRequest{func() domain.PullRequest {
+				pr := domain.NewPullRequest("pr-1", "Feature", "author", "backend", time.Now())
+				originalMergeTime := time.Unix(50, 0)
+				pr.Status = "MERGED"
+				pr.MergedAt = &originalMergeTime
+				return pr
+			}()},
+			id: "pr-1",
+			verify: func(t *testing.T, pr domain.PullRequest) {
+				t.Helper()
+				if pr.Status != "MERGED" {
+					t.Fatalf("expected status MERGED, got %s", pr.Status)
+				}
+				if pr.MergedAt == nil {
+					t.Fatalf("expected MergedAt to be set")
+				}
+				// Проверяем, что время не изменилось (идемпотентность)
+				originalTime := time.Unix(50, 0)
+				if !pr.MergedAt.Equal(originalTime) {
+					t.Fatalf("expected original merge time %v to be preserved, got %v", originalTime, *pr.MergedAt)
 				}
 			},
 		},
@@ -524,23 +634,44 @@ func TestSetUserActiveUseCase_SetActive(t *testing.T) {
 
 	ctx := context.Background()
 
+	errUpdate := errors.New("update failure")
+
 	tests := []struct {
-		name    string
-		users   []domain.User
-		userID  string
-		active  bool
-		wantErr error
-		verify  func(t *testing.T, storage *fakeUserStorage)
+		name      string
+		users     []domain.User
+		userID    string
+		active    bool
+		configure func(storage *fakeUserStorage)
+		wantErr   error
+		verify    func(t *testing.T, storage *fakeUserStorage, result domain.User)
 	}{
 		{
 			name:   "activate user",
 			users:  []domain.User{domain.NewUser("u1", "Alice", "backend", false)},
 			userID: "u1",
 			active: true,
-			verify: func(t *testing.T, storage *fakeUserStorage) {
+			verify: func(t *testing.T, storage *fakeUserStorage, result domain.User) {
 				t.Helper()
 				if !storage.users["u1"].IsActive {
-					t.Fatalf("expected user active")
+					t.Fatalf("expected user active in storage")
+				}
+				if !result.IsActive {
+					t.Fatalf("expected result user active")
+				}
+			},
+		},
+		{
+			name:   "deactivate user",
+			users:  []domain.User{domain.NewUser("u1", "Alice", "backend", true)},
+			userID: "u1",
+			active: false,
+			verify: func(t *testing.T, storage *fakeUserStorage, result domain.User) {
+				t.Helper()
+				if storage.users["u1"].IsActive {
+					t.Fatalf("expected user inactive in storage")
+				}
+				if result.IsActive {
+					t.Fatalf("expected result user inactive")
 				}
 			},
 		},
@@ -550,6 +681,17 @@ func TestSetUserActiveUseCase_SetActive(t *testing.T) {
 			active:  true,
 			wantErr: domain.ErrUserNotFound,
 		},
+		{
+			name:   "update user returns error",
+			users:  []domain.User{domain.NewUser("u1", "Alice", "backend", false)},
+			userID: "u1",
+			active: true,
+			configure: func(storage *fakeUserStorage) {
+				storage.updateErr = errUpdate
+				storage.updateErrID = "u1"
+			},
+			wantErr: errUpdate,
+		},
 	}
 
 	for _, tt := range tests {
@@ -558,14 +700,17 @@ func TestSetUserActiveUseCase_SetActive(t *testing.T) {
 			t.Parallel()
 
 			userStorage := newFakeUserStorage(tt.users...)
+			if tt.configure != nil {
+				tt.configure(userStorage)
+			}
 			uc := NewSetUserActiveUseCase(userStorage, testLogger())
 
-			_, err := uc.SetActive(ctx, tt.userID, tt.active)
+			result, err := uc.SetActive(ctx, tt.userID, tt.active)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("expected %v, got %v", tt.wantErr, err)
 			}
 			if tt.wantErr == nil && tt.verify != nil {
-				tt.verify(t, userStorage)
+				tt.verify(t, userStorage, result)
 			}
 		})
 	}
@@ -662,6 +807,11 @@ func TestListPullRequestsUseCase_List(t *testing.T) {
 			name:    "storage error",
 			wantErr: errList,
 		},
+		{
+			name:        "empty list",
+			initialPRs:  []domain.PullRequest{},
+			expectedLen: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -689,6 +839,401 @@ func TestListPullRequestsUseCase_List(t *testing.T) {
 	}
 }
 
+func TestGetStatsUseCase_GetStats(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	errPRList := errors.New("pr list failure")
+	errUserList := errors.New("user list failure")
+
+	tests := []struct {
+		name       string
+		initialPRs []domain.PullRequest
+		users      []domain.User
+		prErr      error
+		userErr    error
+		wantErr    error
+		verify     func(t *testing.T, stats dto.StatsResponse)
+	}{
+		{
+			name: "success with multiple PRs and reviewers",
+			initialPRs: []domain.PullRequest{
+				func() domain.PullRequest {
+					pr := domain.NewPullRequest("pr-1", "Feature A", "u1", "backend", time.Now())
+					pr.AssignReviewers([]string{"u2", "u3"})
+					return pr
+				}(),
+				func() domain.PullRequest {
+					pr := domain.NewPullRequest("pr-2", "Feature B", "u2", "backend", time.Now())
+					pr.AssignReviewers([]string{"u3"})
+					merged := time.Now()
+					pr.MergedAt = &merged
+					pr.Status = "MERGED"
+					return pr
+				}(),
+				func() domain.PullRequest {
+					pr := domain.NewPullRequest("pr-3", "Feature C", "u3", "backend", time.Now())
+					pr.AssignReviewers([]string{"u1"})
+					return pr
+				}(),
+			},
+			users: []domain.User{
+				domain.NewUser("u1", "Alice", "backend", true),
+				domain.NewUser("u2", "Bob", "backend", true),
+				domain.NewUser("u3", "Charlie", "backend", true),
+			},
+			verify: func(t *testing.T, stats dto.StatsResponse) {
+				t.Helper()
+				if stats.PRStats.TotalPRs != 3 {
+					t.Fatalf("expected 3 total PRs, got %d", stats.PRStats.TotalPRs)
+				}
+				if stats.PRStats.OpenPRs != 2 {
+					t.Fatalf("expected 2 open PRs, got %d", stats.PRStats.OpenPRs)
+				}
+				if stats.PRStats.MergedPRs != 1 {
+					t.Fatalf("expected 1 merged PR, got %d", stats.PRStats.MergedPRs)
+				}
+				if stats.PRStats.ReviewersCount != 3 {
+					t.Fatalf("expected 3 unique reviewers, got %d", stats.PRStats.ReviewersCount)
+				}
+				if len(stats.UserStats) != 3 {
+					t.Fatalf("expected 3 users with assignments, got %d", len(stats.UserStats))
+				}
+				// Проверяем, что у каждого пользователя есть назначения
+				for _, userStat := range stats.UserStats {
+					if userStat.AssignedPRs == 0 {
+						t.Fatalf("expected all users to have assignments, but %s has 0", userStat.UserID)
+					}
+				}
+			},
+		},
+		{
+			name:       "empty PRs and users",
+			initialPRs: []domain.PullRequest{},
+			users:      []domain.User{},
+			verify: func(t *testing.T, stats dto.StatsResponse) {
+				t.Helper()
+				if stats.PRStats.TotalPRs != 0 {
+					t.Fatalf("expected 0 total PRs, got %d", stats.PRStats.TotalPRs)
+				}
+				if len(stats.UserStats) != 0 {
+					t.Fatalf("expected 0 user stats, got %d", len(stats.UserStats))
+				}
+			},
+		},
+		{
+			name: "users without assignments excluded",
+			initialPRs: []domain.PullRequest{
+				func() domain.PullRequest {
+					pr := domain.NewPullRequest("pr-1", "Feature", "u1", "backend", time.Now())
+					pr.AssignReviewers([]string{"u2"})
+					return pr
+				}(),
+			},
+			users: []domain.User{
+				domain.NewUser("u1", "Alice", "backend", true),
+				domain.NewUser("u2", "Bob", "backend", true),
+				domain.NewUser("u3", "Charlie", "backend", true),
+			},
+			verify: func(t *testing.T, stats dto.StatsResponse) {
+				t.Helper()
+				// Только u2 имеет назначения
+				if len(stats.UserStats) != 1 {
+					t.Fatalf("expected 1 user with assignments, got %d", len(stats.UserStats))
+				}
+				if stats.UserStats[0].UserID != "u2" {
+					t.Fatalf("expected u2 to have assignments, got %s", stats.UserStats[0].UserID)
+				}
+			},
+		},
+		{
+			name: "PR without reviewers",
+			initialPRs: []domain.PullRequest{
+				domain.NewPullRequest("pr-1", "Feature", "u1", "backend", time.Now()),
+			},
+			users: []domain.User{
+				domain.NewUser("u1", "Alice", "backend", true),
+			},
+			verify: func(t *testing.T, stats dto.StatsResponse) {
+				t.Helper()
+				if stats.PRStats.TotalPRs != 1 {
+					t.Fatalf("expected 1 total PR, got %d", stats.PRStats.TotalPRs)
+				}
+				if stats.PRStats.ReviewersCount != 0 {
+					t.Fatalf("expected 0 reviewers, got %d", stats.PRStats.ReviewersCount)
+				}
+				if len(stats.UserStats) != 0 {
+					t.Fatalf("expected 0 user stats, got %d", len(stats.UserStats))
+				}
+			},
+		},
+		{
+			name:    "PR list error",
+			prErr:   errPRList,
+			wantErr: errPRList,
+		},
+		{
+			name: "user list error",
+			initialPRs: []domain.PullRequest{
+				domain.NewPullRequest("pr-1", "Feature", "u1", "backend", time.Now()),
+			},
+			userErr: errUserList,
+			wantErr: errUserList,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			prStorage := newFakePullRequestStorage(tt.initialPRs...)
+			if tt.prErr != nil {
+				prStorage.listErr = tt.prErr
+			}
+
+			userStorage := newFakeUserStorage(tt.users...)
+			if tt.userErr != nil {
+				userStorage.listErr = tt.userErr
+			}
+
+			uc := NewGetStatsUseCase(prStorage, userStorage, testLogger())
+
+			stats, err := uc.GetStats(ctx)
+
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.verify != nil {
+				tt.verify(t, stats)
+			}
+		})
+	}
+}
+
+func TestDeactivateTeamUsersUseCase_DeactivateTeamUsers(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		teamName string
+		users    []domain.User
+		teams    []domain.Team
+		prs      []domain.PullRequest
+		wantErr  error
+		verify   func(t *testing.T, result DeactivateResult, userStorage *fakeUserStorage, prStorage *fakePullRequestStorage)
+	}{
+		{
+			name:     "success deactivates all team members and reassigns PRs",
+			teamName: "backend",
+			users: []domain.User{
+				domain.NewUser("u1", "Alice", "backend", true),
+				domain.NewUser("u2", "Bob", "backend", true),
+				domain.NewUser("u3", "Charlie", "backend", true),
+			},
+			teams: []domain.Team{
+				domain.NewTeam("backend", []domain.User{
+					domain.NewUser("u1", "Alice", "backend", true),
+					domain.NewUser("u2", "Bob", "backend", true),
+					domain.NewUser("u3", "Charlie", "backend", true),
+				}),
+			},
+			prs: []domain.PullRequest{
+				func() domain.PullRequest {
+					pr := domain.NewPullRequest("pr-1", "Fix bug", "u1", "backend", time.Now())
+					pr.AssignReviewers([]string{"u2", "u3"})
+					return pr
+				}(),
+				func() domain.PullRequest {
+					pr := domain.NewPullRequest("pr-2", "Add feature", "u2", "backend", time.Now())
+					pr.AssignReviewers([]string{"u1"})
+					return pr
+				}(),
+			},
+			verify: func(t *testing.T, result DeactivateResult, userStorage *fakeUserStorage, prStorage *fakePullRequestStorage) {
+				t.Helper()
+				if result.DeactivatedCount != 3 {
+					t.Fatalf("expected 3 deactivations, got %d", result.DeactivatedCount)
+				}
+				for _, userID := range []string{"u1", "u2", "u3"} {
+					if userStorage.users[userID].IsActive {
+						t.Fatalf("expected user %s to be inactive", userID)
+					}
+				}
+			},
+		},
+		{
+			name:     "empty team returns zero counts",
+			teamName: "backend",
+			users:    []domain.User{},
+			teams: []domain.Team{
+				domain.NewTeam("backend", []domain.User{}),
+			},
+			prs: []domain.PullRequest{},
+			verify: func(t *testing.T, result DeactivateResult, userStorage *fakeUserStorage, prStorage *fakePullRequestStorage) {
+				t.Helper()
+				if result.DeactivatedCount != 0 {
+					t.Fatalf("expected 0 deactivations, got %d", result.DeactivatedCount)
+				}
+				if result.ReassignedPRCount != 0 {
+					t.Fatalf("expected 0 reassignments, got %d", result.ReassignedPRCount)
+				}
+			},
+		},
+		{
+			name:     "all users already inactive",
+			teamName: "backend",
+			users: []domain.User{
+				domain.NewUser("u1", "Alice", "backend", false),
+				domain.NewUser("u2", "Bob", "backend", false),
+			},
+			teams: []domain.Team{
+				domain.NewTeam("backend", []domain.User{
+					domain.NewUser("u1", "Alice", "backend", false),
+					domain.NewUser("u2", "Bob", "backend", false),
+				}),
+			},
+			prs: []domain.PullRequest{},
+			verify: func(t *testing.T, result DeactivateResult, userStorage *fakeUserStorage, prStorage *fakePullRequestStorage) {
+				t.Helper()
+				if result.DeactivatedCount != 0 {
+					t.Fatalf("expected 0 deactivations, got %d", result.DeactivatedCount)
+				}
+			},
+		},
+		{
+			name:     "reassigns PRs when replacement available",
+			teamName: "backend",
+			users: []domain.User{
+				domain.NewUser("u1", "Alice", "backend", true),
+				domain.NewUser("u2", "Bob", "backend", true),
+				domain.NewUser("u3", "Charlie", "backend", true),
+				domain.NewUser("u4", "Dave", "backend", true),
+			},
+			teams: []domain.Team{
+				domain.NewTeam("backend", []domain.User{
+					domain.NewUser("u1", "Alice", "backend", true),
+					domain.NewUser("u2", "Bob", "backend", true),
+					domain.NewUser("u3", "Charlie", "backend", true),
+					domain.NewUser("u4", "Dave", "backend", true),
+				}),
+			},
+			prs: []domain.PullRequest{
+				func() domain.PullRequest {
+					pr := domain.NewPullRequest("pr-1", "Fix", "u1", "backend", time.Now())
+					pr.AssignReviewers([]string{"u2"})
+					return pr
+				}(),
+			},
+			verify: func(t *testing.T, result DeactivateResult, userStorage *fakeUserStorage, prStorage *fakePullRequestStorage) {
+				t.Helper()
+				if result.ReassignedPRCount != 1 {
+					t.Fatalf("expected 1 reassignment, got %d", result.ReassignedPRCount)
+				}
+				pr, _ := prStorage.GetPullRequest(context.Background(), "pr-1")
+				if len(pr.Reviewers) == 0 || pr.Reviewers[0] == "u2" {
+					t.Fatalf("expected u2 to be replaced, got reviewers %v", pr.Reviewers)
+				}
+			},
+		},
+		{
+			name:     "removes reviewer when no replacement available",
+			teamName: "backend",
+			users: []domain.User{
+				domain.NewUser("u1", "Alice", "backend", true),
+				domain.NewUser("u2", "Bob", "backend", true),
+			},
+			teams: []domain.Team{
+				domain.NewTeam("backend", []domain.User{
+					domain.NewUser("u1", "Alice", "backend", true),
+					domain.NewUser("u2", "Bob", "backend", true),
+				}),
+			},
+			prs: []domain.PullRequest{
+				func() domain.PullRequest {
+					pr := domain.NewPullRequest("pr-1", "Fix", "u1", "backend", time.Now())
+					pr.AssignReviewers([]string{"u2"})
+					return pr
+				}(),
+			},
+			verify: func(t *testing.T, result DeactivateResult, userStorage *fakeUserStorage, prStorage *fakePullRequestStorage) {
+				t.Helper()
+				pr, _ := prStorage.GetPullRequest(context.Background(), "pr-1")
+				if len(pr.Reviewers) != 0 {
+					t.Fatalf("expected reviewer removed, got %v", pr.Reviewers)
+				}
+			},
+		},
+		{
+			name:     "skips merged PRs",
+			teamName: "backend",
+			users: []domain.User{
+				domain.NewUser("u1", "Alice", "backend", true),
+				domain.NewUser("u2", "Bob", "backend", true),
+			},
+			teams: []domain.Team{
+				domain.NewTeam("backend", []domain.User{
+					domain.NewUser("u1", "Alice", "backend", true),
+					domain.NewUser("u2", "Bob", "backend", true),
+				}),
+			},
+			prs: []domain.PullRequest{
+				func() domain.PullRequest {
+					pr := domain.NewPullRequest("pr-1", "Fix", "u1", "backend", time.Now())
+					pr.AssignReviewers([]string{"u2"})
+					pr.Status = "MERGED"
+					return pr
+				}(),
+			},
+			verify: func(t *testing.T, result DeactivateResult, userStorage *fakeUserStorage, prStorage *fakePullRequestStorage) {
+				t.Helper()
+				if result.ReassignedPRCount != 0 {
+					t.Fatalf("expected 0 reassignments for merged PR, got %d", result.ReassignedPRCount)
+				}
+			},
+		},
+		{
+			name:     "team not found",
+			teamName: "nonexistent",
+			wantErr:  domain.ErrTeamNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			userStorage := newFakeUserStorage(tt.users...)
+			teamStorage := newFakeTeamStorage(tt.teams...)
+			prStorage := newFakePullRequestStorage(tt.prs...)
+
+			uc := NewDeactivateTeamUsersUseCase(userStorage, teamStorage, prStorage, &fakeRandom{}, testLogger())
+
+			result, err := uc.DeactivateTeamUsers(ctx, tt.teamName)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected error %v, got %v", tt.wantErr, err)
+			}
+
+			if tt.wantErr == nil && tt.verify != nil {
+				tt.verify(t, result, userStorage, prStorage)
+			}
+		})
+	}
+}
+
 // test helpers
 
 func testLogger() *slog.Logger {
@@ -703,6 +1248,7 @@ type fakeUserStorage struct {
 	getErrID    string
 	updateErr   error
 	updateErrID string
+	listErr     error
 }
 
 func newFakeUserStorage(users ...domain.User) *fakeUserStorage {
@@ -722,6 +1268,9 @@ func (f *fakeUserStorage) CreateUser(_ context.Context, user domain.User) error 
 }
 
 func (f *fakeUserStorage) ListUsers(_ context.Context) ([]domain.User, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
 	result := make([]domain.User, 0, len(f.users))
 	for _, user := range f.users {
 		result = append(result, user)

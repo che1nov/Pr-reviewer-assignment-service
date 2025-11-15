@@ -66,18 +66,22 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	mergePullRequestUC := usecases.NewMergePullRequestUseCase(prStorage, clockAdapter, logger)
 	reassignReviewerUC := usecases.NewReassignReviewerUseCase(prStorage, teamStorage, userStorage, randomAdapter, logger)
 	getReviewerPRsUC := usecases.NewGetReviewerPullRequestsUseCase(prStorage, logger)
+	getStatsUC := usecases.NewGetStatsUseCase(prStorage, userStorage, logger)
+	deactivateTeamUsersUC := usecases.NewDeactivateTeamUsersUseCase(userStorage, teamStorage, prStorage, randomAdapter, logger)
 
 	router := httpcontroller.NewRouter(httpcontroller.RouterConfig{
-		Logger:                   logger,
-		AdminToken:               cfg.AdminToken,
-		UserToken:                cfg.UserToken,
-		AddTeamUseCase:           createTeamUC,
-		GetTeamUseCase:           getTeamUC,
-		SetUserActiveUseCase:     setUserActiveUC,
-		CreatePullRequestUseCase: createPullRequestUC,
-		MergePullRequestUseCase:  mergePullRequestUC,
-		ReassignReviewerUseCase:  reassignReviewerUC,
-		GetReviewerPRsUseCase:    getReviewerPRsUC,
+		Logger:                     logger,
+		AdminToken:                 cfg.AdminToken,
+		UserToken:                  cfg.UserToken,
+		AddTeamUseCase:             createTeamUC,
+		GetTeamUseCase:             getTeamUC,
+		SetUserActiveUseCase:       setUserActiveUC,
+		CreatePullRequestUseCase:   createPullRequestUC,
+		MergePullRequestUseCase:    mergePullRequestUC,
+		ReassignReviewerUseCase:    reassignReviewerUC,
+		GetReviewerPRsUseCase:      getReviewerPRsUC,
+		GetStatsUseCase:            getStatsUC,
+		DeactivateTeamUsersUseCase: deactivateTeamUsersUC,
 	})
 
 	server := &http.Server{
