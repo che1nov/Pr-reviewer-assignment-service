@@ -37,6 +37,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		respondJSON(cfg.Logger, w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
+	r.Get("/swagger", ServeSwaggerUI)
+	r.Get("/openapi.yml", ServeOpenAPISpec)
+
 	teamHandler := NewTeamHandler(cfg.Logger, cfg.AddTeamUseCase, cfg.GetTeamUseCase)
 	prHandler := NewPullRequestHandler(cfg.Logger, cfg.CreatePullRequestUseCase, cfg.MergePullRequestUseCase, cfg.ReassignReviewerUseCase)
 	userHandler := NewUserHandler(cfg.Logger, cfg.SetUserActiveUseCase, cfg.GetReviewerPRsUseCase)
