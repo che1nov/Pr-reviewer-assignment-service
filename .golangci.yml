@@ -28,7 +28,7 @@ linters-settings:
     line-length: 140
   
   goimports:
-    local-prefixes: github.com/che1nov/backend-trainee-assignment-autumn-2025
+    local-prefixes: github.com/che1nov/Pr-reviewer-assignment-service
   
   gocritic:
     enabled-tags:

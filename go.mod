@@ -1,4 +1,4 @@
-module github.com/che1nov/backend-trainee-assignment-autumn-2025
+module github.com/che1nov/Pr-reviewer-assignment-service
 
 go 1.24.0
 

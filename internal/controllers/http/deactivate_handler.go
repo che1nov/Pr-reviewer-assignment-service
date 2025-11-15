@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/dto"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/usecases"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/domain"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/dto"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/usecases"
 )
 
 type DeactivateHandler struct {

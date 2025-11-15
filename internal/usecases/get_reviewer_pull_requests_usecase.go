@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/domain"
 )
 
 type GetReviewerPullRequestsUseCase struct {
@@ -31,4 +31,3 @@ func (uc *GetReviewerPullRequestsUseCase) ListByReviewer(ctx context.Context, re
 
 	return prs, nil
 }
-

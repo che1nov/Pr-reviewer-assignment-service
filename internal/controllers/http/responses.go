@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/dto"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/dto"
 )
 
 func respondJSON(logger *slog.Logger, w http.ResponseWriter, status int, payload any) {

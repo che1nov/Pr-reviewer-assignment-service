@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/dto"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/domain"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/dto"
 )
 
 func TestCreateTeamUseCase_Create(t *testing.T) {

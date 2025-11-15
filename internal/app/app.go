@@ -9,13 +9,13 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/config"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/adapters/memory"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/adapters/postgresql"
-	httpcontroller "github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/controllers/http"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/usecases"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/pkg/clock"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/pkg/random"
+	"github.com/che1nov/Pr-reviewer-assignment-service/config"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/adapters/memory"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/adapters/postgresql"
+	httpcontroller "github.com/che1nov/Pr-reviewer-assignment-service/internal/controllers/http"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/usecases"
+	"github.com/che1nov/Pr-reviewer-assignment-service/pkg/clock"
+	"github.com/che1nov/Pr-reviewer-assignment-service/pkg/random"
 )
 
 // App запущенное приложение

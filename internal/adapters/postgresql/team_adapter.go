@@ -7,7 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/domain"
 )
 
 type TeamAdapter struct {

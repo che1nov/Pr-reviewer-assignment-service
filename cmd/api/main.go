@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/config"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/app"
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/pkg/logger"
+	"github.com/che1nov/Pr-reviewer-assignment-service/config"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/app"
+	"github.com/che1nov/Pr-reviewer-assignment-service/pkg/logger"
 )
 
 func main() {
@@ -28,7 +28,7 @@ func main() {
 
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*15))
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := application.Shutdown(shutdownCtx); err != nil {
 			log.Error("shutdown failed", "error", err)

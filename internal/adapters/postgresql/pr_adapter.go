@@ -7,7 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/che1nov/backend-trainee-assignment-autumn-2025/internal/domain"
+	"github.com/che1nov/Pr-reviewer-assignment-service/internal/domain"
 )
 
 type PullRequestAdapter struct {
@@ -54,7 +54,7 @@ func (a *PullRequestAdapter) ListPullRequests(ctx context.Context) ([]domain.Pul
 		a.log.ErrorContext(ctx, "ошибка получения списка pull request", "error", err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []domain.PullRequest
 	for rows.Next() {
@@ -153,7 +153,7 @@ func (a *PullRequestAdapter) ListPullRequestsByReviewer(ctx context.Context, rev
 		a.log.ErrorContext(ctx, "ошибка получения pull request по ревьюеру", "reviewer_id", reviewerID, "error", err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []domain.PullRequest
 	for rows.Next() {
@@ -188,7 +188,7 @@ func (a *PullRequestAdapter) loadReviewers(ctx context.Context, prID string) ([]
 		a.log.ErrorContext(ctx, "ошибка получения ревьюеров pull request", "pr_id", prID, "error", err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	reviewers := make([]string, 0, 2)
 	for rows.Next() {
