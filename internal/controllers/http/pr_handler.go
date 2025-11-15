@@ -119,42 +119,42 @@ func toPullRequest(pr domain.PullRequest) dto.PullRequest {
 func mapCreatePRError(err error) (int, string, string) {
 	switch {
 	case errors.Is(err, domain.ErrPullRequestExists):
-		return http.StatusConflict, "PR_EXISTS", "pull request already exists"
+		return http.StatusConflict, ErrCodePRExists, "pull request already exists"
 	case errors.Is(err, domain.ErrUserNotFound):
-		return http.StatusNotFound, "NOT_FOUND", "author not found"
+		return http.StatusNotFound, ErrCodeNotFound, "author not found"
 	case errors.Is(err, domain.ErrTeamNotFound):
-		return http.StatusNotFound, "NOT_FOUND", "team not found"
+		return http.StatusNotFound, ErrCodeNotFound, "team not found"
 	case errors.Is(err, domain.ErrNoReviewerCandidates):
-		return http.StatusConflict, "NO_CANDIDATE", "no active reviewer candidates in team"
+		return http.StatusConflict, ErrCodeNoCandidate, "no active reviewer candidates in team"
 	default:
-		return http.StatusInternalServerError, "INTERNAL", "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
 	}
 }
 
 func mapMergePRError(err error) (int, string, string) {
 	switch {
 	case errors.Is(err, domain.ErrPullRequestNotFound):
-		return http.StatusNotFound, "NOT_FOUND", "pull request not found"
+		return http.StatusNotFound, ErrCodeNotFound, "pull request not found"
 	default:
-		return http.StatusInternalServerError, "INTERNAL", "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
 	}
 }
 
 func mapReassignPRError(err error) (int, string, string) {
 	switch {
 	case errors.Is(err, domain.ErrPullRequestNotFound):
-		return http.StatusNotFound, "NOT_FOUND", "pull request not found"
+		return http.StatusNotFound, ErrCodeNotFound, "pull request not found"
 	case errors.Is(err, domain.ErrReviewerNotAssigned):
-		return http.StatusConflict, "NOT_ASSIGNED", "reviewer is not assigned to this PR"
+		return http.StatusConflict, ErrCodeNotAssigned, "reviewer is not assigned to this PR"
 	case errors.Is(err, domain.ErrPullRequestMerged):
-		return http.StatusConflict, "PR_MERGED", "cannot reassign reviewer on merged PR"
+		return http.StatusConflict, ErrCodePRMerged, "cannot reassign reviewer on merged PR"
 	case errors.Is(err, domain.ErrUserNotFound):
-		return http.StatusNotFound, "NOT_FOUND", "user not found"
+		return http.StatusNotFound, ErrCodeNotFound, "user not found"
 	case errors.Is(err, domain.ErrNoReviewerCandidates):
-		return http.StatusConflict, "NO_CANDIDATE", "no active replacement candidate in team"
+		return http.StatusConflict, ErrCodeNoCandidate, "no active replacement candidate in team"
 	case errors.Is(err, domain.ErrReviewerInactive):
-		return http.StatusConflict, "NO_CANDIDATE", "reviewer inactive"
+		return http.StatusConflict, ErrCodeNoCandidate, "reviewer inactive"
 	default:
-		return http.StatusInternalServerError, "INTERNAL", "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
 	}
 }

@@ -69,7 +69,7 @@ func (h *TeamHandler) GetTeam(w http.ResponseWriter, r *http.Request) {
 	team, err := h.getTeamUC.Get(r.Context(), teamName)
 	if err != nil {
 		h.logger.WarnContext(r.Context(), "команда не найдена", "team_name", teamName, "error", err)
-		respondError(h.logger, w, http.StatusNotFound, "NOT_FOUND", err.Error())
+		respondError(h.logger, w, http.StatusNotFound, ErrCodeNotFound, err.Error())
 		return
 	}
 
@@ -94,8 +94,8 @@ func toTeam(team domain.Team) dto.Team {
 func mapTeamError(err error) (int, string, string) {
 	switch {
 	case errors.Is(err, domain.ErrTeamExists):
-		return http.StatusBadRequest, "TEAM_EXISTS", "team_name already exists"
+		return http.StatusBadRequest, ErrCodeTeamExists, "team_name already exists"
 	default:
-		return http.StatusInternalServerError, "INTERNAL", "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
 	}
 }

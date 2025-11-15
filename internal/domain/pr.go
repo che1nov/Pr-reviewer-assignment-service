@@ -2,6 +2,12 @@ package domain
 
 import "time"
 
+// Статусы Pull Request
+const (
+	PRStatusOpen   = "OPEN"
+	PRStatusMerged = "MERGED"
+)
+
 type PullRequest struct {
 	ID        string
 	Title     string
@@ -19,7 +25,7 @@ func NewPullRequest(id, title, authorID, teamName string, createdAt time.Time) P
 		Title:     title,
 		AuthorID:  authorID,
 		TeamName:  teamName,
-		Status:    "OPEN",
+		Status:    PRStatusOpen,
 		Reviewers: make([]string, 0, 2),
 		CreatedAt: createdAt,
 	}
@@ -30,18 +36,18 @@ func (pr *PullRequest) AssignReviewers(reviewers []string) {
 }
 
 func (pr *PullRequest) MarkMerged(mergedAt time.Time) {
-	if pr.Status == "MERGED" {
+	if pr.Status == PRStatusMerged {
 		if pr.MergedAt == nil {
 			pr.MergedAt = &mergedAt
 		}
 		return
 	}
-	pr.Status = "MERGED"
+	pr.Status = PRStatusMerged
 	pr.MergedAt = &mergedAt
 }
 
 func (pr *PullRequest) AddReviewer(reviewerID string) error {
-	if pr.Status == "MERGED" {
+	if pr.Status == PRStatusMerged {
 		return ErrPullRequestMerged
 	}
 	if reviewerID == pr.AuthorID {
@@ -60,7 +66,7 @@ func (pr *PullRequest) AddReviewer(reviewerID string) error {
 }
 
 func (pr *PullRequest) ReplaceReviewer(oldReviewerID, newReviewerID string) error {
-	if pr.Status == "MERGED" {
+	if pr.Status == PRStatusMerged {
 		return ErrPullRequestMerged
 	}
 	if newReviewerID == pr.AuthorID {

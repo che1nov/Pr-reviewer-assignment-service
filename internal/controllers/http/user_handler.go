@@ -63,7 +63,7 @@ func (h *UserHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 	prs, err := h.getReviewsUseCase.ListByReviewer(r.Context(), userID)
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "ошибка получения pull request пользователя", "error", err, "user_id", userID)
-		respondError(h.logger, w, http.StatusInternalServerError, "INTERNAL", err.Error())
+		respondError(h.logger, w, http.StatusInternalServerError, ErrCodeInternal, err.Error())
 		return
 	}
 
@@ -95,8 +95,8 @@ func toUser(user domain.User) dto.User {
 func mapUserError(err error) (int, string, string) {
 	switch {
 	case errors.Is(err, domain.ErrUserNotFound):
-		return http.StatusNotFound, "NOT_FOUND", "user not found"
+		return http.StatusNotFound, ErrCodeNotFound, "user not found"
 	default:
-		return http.StatusInternalServerError, "INTERNAL", "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
 	}
 }
