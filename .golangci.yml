@@ -1,0 +1,139 @@
+version: 2
+
+run:
+  timeout: 5m
+  tests: true
+  build-tags:
+    - integration
+
+linters-settings:
+  govet:
+    check-shadowing: true
+    enable-all: true
+  
+  gocyclo:
+    min-complexity: 15
+  
+  dupl:
+    threshold: 100
+  
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  
+  misspell:
+    locale: US
+  
+  lll:
+    line-length: 140
+  
+  goimports:
+    local-prefixes: github.com/che1nov/backend-trainee-assignment-autumn-2025
+  
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - whyNoLint
+      - wrapperFunc
+  
+  funlen:
+    lines: 100
+    statements: 50
+  
+  gofmt:
+    simplify: true
+  
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+        disabled: false
+      - name: package-comments
+        severity: warning
+        disabled: false
+      - name: var-naming
+        severity: warning
+        disabled: false
+      - name: indent-error-flow
+        severity: warning
+        disabled: false
+      - name: error-return
+        severity: warning
+        disabled: false
+      - name: error-naming
+        severity: warning
+        disabled: false
+      - name: error-strings
+        severity: warning
+        disabled: false
+      - name: receiver-naming
+        severity: warning
+        disabled: false
+
+linters:
+  disable-all: true
+  enable:
+    # Default linters
+    - errcheck      # Проверка некорректной обработки ошибок
+    - govet         # Стандартный vet анализатор
+    - ineffassign   # Обнаружение бесполезных присваиваний
+    - staticcheck   # Большой набор статических проверок
+    - unused        # Проверка неиспользуемого кода
+    
+    # Дополнительные рекомендуемые линтеры
+    - gocyclo       # Сложность функций
+    - revive        # Быстрая замена golint
+    - gosec         # Проверка безопасности
+    - misspell      # Орфографические ошибки
+    - unconvert     # Ненужные приведения типов
+    - goconst       # Константы
+    - gocritic      # Мета-линтер
+    - gocognit      # Когнитивная сложность
+    - bodyclose     # Закрытие HTTP body
+    - whitespace    # Пробелы
+    - funlen        # Длина функций
+    - dupl          # Дублирование кода
+
+formatters:
+  enable:
+    - gofmt         # Форматирование кода
+    - goimports     # Импорты
+
+issues:
+  exclude-rules:
+    # Исключаем некоторые проверки для тестов
+    - path: _test\.go
+      linters:
+        - funlen
+        - dupl
+        - goconst
+        - gocyclo
+        - gocognit
+    
+    # Исключаем проверки для main.go (точка входа)
+    - path: cmd/api/main\.go
+      linters:
+        - funlen
+    
+    # Исключаем проверки для fake реализаций в тестах
+    - path: usecases_test\.go
+      linters:
+        - unused
+        - dupl
+        - goconst
+  
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true
+
