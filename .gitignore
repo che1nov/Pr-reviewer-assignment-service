@@ -1,4 +1,23 @@
-# ignore external specification and local IDE config files
-openapi.yml
-Backend-trainee-assignment-autumn-2025.md
+# Бинарники
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Результаты тестов
+*.test
+*.out
+coverage.txt
+load_test_results.json
+
+# IDE
 .idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
