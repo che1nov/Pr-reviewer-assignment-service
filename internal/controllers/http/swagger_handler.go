@@ -1,15 +1,30 @@
 package httpcontroller
 
 import (
-	_ "embed"
 	"net/http"
+	"os"
+	"sync"
 )
 
-//go:embed openapi.yml
-var openAPISpec []byte
+var (
+	openAPISpec     []byte
+	openAPISpecOnce sync.Once
+)
 
-// ServeOpenAPISpec возвращает OpenAPI спецификацию
+// ServeOpenAPISpec возвращает OpenAPI спецификацию из корня проекта
 func ServeOpenAPISpec(w http.ResponseWriter, r *http.Request) {
+	openAPISpecOnce.Do(func() {
+		data, err := os.ReadFile("openapi.yml")
+		if err == nil {
+			openAPISpec = data
+		}
+	})
+
+	if len(openAPISpec) == 0 {
+		http.Error(w, "OpenAPI spec not found", http.StatusNotFound)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/x-yaml")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Write(openAPISpec)
@@ -52,8 +67,7 @@ func ServeSwaggerUI(w http.ResponseWriter, r *http.Request) {
     </script>
 </body>
 </html>`
-	
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }
-

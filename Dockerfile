@@ -23,6 +23,7 @@ RUN apk add --no-cache ca-certificates postgresql-client
 WORKDIR /app
 
 COPY --from=builder /build/service ./service
+COPY --from=builder /src/openapi.yml ./openapi.yml
 
 EXPOSE 8080
 
