@@ -59,8 +59,8 @@ func (h *DeactivateHandler) DeactivateTeamUsers(w http.ResponseWriter, r *http.R
 func mapDeactivateError(err error) (int, string, string) {
 	switch {
 	case errors.Is(err, domain.ErrTeamNotFound):
-		return http.StatusNotFound, "NOT_FOUND", "team not found"
+		return http.StatusNotFound, ErrCodeNotFound, "team not found"
 	default:
-		return http.StatusInternalServerError, "INTERNAL", "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, ErrMsgInternalError
 	}
 }

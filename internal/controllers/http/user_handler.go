@@ -97,6 +97,6 @@ func mapUserError(err error) (int, string, string) {
 	case errors.Is(err, domain.ErrUserNotFound):
 		return http.StatusNotFound, ErrCodeNotFound, "user not found"
 	default:
-		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, ErrMsgInternalError
 	}
 }

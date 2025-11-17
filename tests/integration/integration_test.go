@@ -69,7 +69,7 @@ func setupTestServer(t *testing.T) *testServer {
 
 func (ts *testServer) Close() {
 	ts.server.Close()
-	ts.db.Close()
+	_ = ts.db.Close()
 }
 
 func cleanupDB(t *testing.T, db *sqlx.DB) {
@@ -96,12 +96,14 @@ func TestFullWorkflow(t *testing.T) {
 
 	resp := makeRequest(t, ts, "POST", "/team/add", team, adminToken)
 	assertEqual(t, http.StatusCreated, resp.StatusCode, "Создание команды")
+	defer closeResponseBody(t, resp)
 
 	var teamResp map[string]interface{}
 	mustDecodeJSON(t, resp, &teamResp)
 
 	resp = makeRequest(t, ts, "GET", "/team/get?team_name=backend", nil, userToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Получение команды")
+	defer closeResponseBody(t, resp)
 
 	pr := map[string]interface{}{
 		"pull_request_id":   "pr-1",
@@ -111,6 +113,7 @@ func TestFullWorkflow(t *testing.T) {
 
 	resp = makeRequest(t, ts, "POST", "/pullRequest/create", pr, adminToken)
 	assertEqual(t, http.StatusCreated, resp.StatusCode, "Создание PR")
+	defer closeResponseBody(t, resp)
 
 	var prResp map[string]interface{}
 	mustDecodeJSON(t, resp, &prResp)
@@ -126,6 +129,7 @@ func TestFullWorkflow(t *testing.T) {
 	reviewer := reviewers[0].(string)
 	resp = makeRequest(t, ts, "GET", fmt.Sprintf("/users/getReview?user_id=%s", reviewer), nil, userToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Получение PR для ревьювера")
+	defer closeResponseBody(t, resp)
 
 	var reviewerPRs map[string]interface{}
 	mustDecodeJSON(t, resp, &reviewerPRs)
@@ -141,6 +145,7 @@ func TestFullWorkflow(t *testing.T) {
 
 	resp = makeRequest(t, ts, "POST", "/pullRequest/reassign", reassign, adminToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Переназначение ревьювера")
+	defer closeResponseBody(t, resp)
 
 	merge := map[string]interface{}{
 		"pull_request_id": "pr-1",
@@ -148,6 +153,7 @@ func TestFullWorkflow(t *testing.T) {
 
 	resp = makeRequest(t, ts, "POST", "/pullRequest/merge", merge, adminToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Merge PR")
+	defer closeResponseBody(t, resp)
 
 	var mergeResp map[string]interface{}
 	mustDecodeJSON(t, resp, &mergeResp)
@@ -156,9 +162,11 @@ func TestFullWorkflow(t *testing.T) {
 
 	resp = makeRequest(t, ts, "POST", "/pullRequest/merge", merge, adminToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Повторный merge должен быть успешным")
+	defer closeResponseBody(t, resp)
 
 	resp = makeRequest(t, ts, "POST", "/pullRequest/reassign", reassign, adminToken)
 	assertEqual(t, http.StatusConflict, resp.StatusCode, "Переназначение после merge должно быть запрещено")
+	defer closeResponseBody(t, resp)
 }
 
 func TestStatistics(t *testing.T) {
@@ -175,7 +183,8 @@ func TestStatistics(t *testing.T) {
 			{"user_id": "dev2", "username": "Dev2", "is_active": true},
 		},
 	}
-	makeRequest(t, ts, "POST", "/team/add", team, adminToken)
+	resp := makeRequest(t, ts, "POST", "/team/add", team, adminToken)
+	defer closeResponseBody(t, resp)
 
 	for i := 1; i <= 3; i++ {
 		pr := map[string]interface{}{
@@ -183,14 +192,17 @@ func TestStatistics(t *testing.T) {
 			"pull_request_name": fmt.Sprintf("Feature %d", i),
 			"author_id":         "dev1",
 		}
-		makeRequest(t, ts, "POST", "/pullRequest/create", pr, adminToken)
+		resp := makeRequest(t, ts, "POST", "/pullRequest/create", pr, adminToken)
+		defer closeResponseBody(t, resp)
 	}
 
 	merge := map[string]interface{}{"pull_request_id": "pr-1"}
-	makeRequest(t, ts, "POST", "/pullRequest/merge", merge, adminToken)
+	resp = makeRequest(t, ts, "POST", "/pullRequest/merge", merge, adminToken)
+	defer closeResponseBody(t, resp)
 
-	resp := makeRequest(t, ts, "GET", "/stats", nil, userToken)
+	resp = makeRequest(t, ts, "GET", "/stats", nil, userToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Получение статистики")
+	defer closeResponseBody(t, resp)
 
 	var stats map[string]interface{}
 	mustDecodeJSON(t, resp, &stats)
@@ -215,7 +227,8 @@ func TestDeactivateTeamUsers(t *testing.T) {
 			{"user_id": "a2", "username": "A2", "is_active": true},
 		},
 	}
-	makeRequest(t, ts, "POST", "/team/add", team1, adminToken)
+	resp := makeRequest(t, ts, "POST", "/team/add", team1, adminToken)
+	defer closeResponseBody(t, resp)
 
 	team2 := map[string]interface{}{
 		"team_name": "team-b",
@@ -224,18 +237,21 @@ func TestDeactivateTeamUsers(t *testing.T) {
 			{"user_id": "b2", "username": "B2", "is_active": true},
 		},
 	}
-	makeRequest(t, ts, "POST", "/team/add", team2, adminToken)
+	resp = makeRequest(t, ts, "POST", "/team/add", team2, adminToken)
+	defer closeResponseBody(t, resp)
 
 	pr := map[string]interface{}{
 		"pull_request_id":   "pr-test",
 		"pull_request_name": "Test PR",
 		"author_id":         "b1",
 	}
-	makeRequest(t, ts, "POST", "/pullRequest/create", pr, adminToken)
+	resp = makeRequest(t, ts, "POST", "/pullRequest/create", pr, adminToken)
+	defer closeResponseBody(t, resp)
 
 	deactivate := map[string]interface{}{"team_name": "team-a"}
-	resp := makeRequest(t, ts, "POST", "/team/deactivateUsers", deactivate, adminToken)
+	resp = makeRequest(t, ts, "POST", "/team/deactivateUsers", deactivate, adminToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Деактивация команды")
+	defer closeResponseBody(t, resp)
 
 	var result map[string]interface{}
 	mustDecodeJSON(t, resp, &result)
@@ -245,6 +261,7 @@ func TestDeactivateTeamUsers(t *testing.T) {
 	setActive := map[string]interface{}{"user_id": "a1", "is_active": false}
 	resp = makeRequest(t, ts, "POST", "/users/setIsActive", setActive, adminToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Пользователь уже неактивен")
+	defer closeResponseBody(t, resp)
 }
 
 func TestUserActivation(t *testing.T) {
@@ -260,15 +277,18 @@ func TestUserActivation(t *testing.T) {
 			{"user_id": "u1", "username": "User1", "is_active": true},
 		},
 	}
-	makeRequest(t, ts, "POST", "/team/add", team, adminToken)
+	resp := makeRequest(t, ts, "POST", "/team/add", team, adminToken)
+	defer closeResponseBody(t, resp)
 
 	setActive := map[string]interface{}{"user_id": "u1", "is_active": false}
-	resp := makeRequest(t, ts, "POST", "/users/setIsActive", setActive, adminToken)
+	resp = makeRequest(t, ts, "POST", "/users/setIsActive", setActive, adminToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Деактивация пользователя")
+	defer closeResponseBody(t, resp)
 
 	setActive = map[string]interface{}{"user_id": "u1", "is_active": true}
 	resp = makeRequest(t, ts, "POST", "/users/setIsActive", setActive, adminToken)
 	assertEqual(t, http.StatusOK, resp.StatusCode, "Активация пользователя")
+	defer closeResponseBody(t, resp)
 }
 
 func makeRequest(t *testing.T, ts *testServer, method, path string, body interface{}, token string) *http.Response {
@@ -308,10 +328,17 @@ func makeRequest(t *testing.T, ts *testServer, method, path string, body interfa
 
 func mustDecodeJSON(t *testing.T, resp *http.Response, v interface{}) {
 	t.Helper()
-	defer resp.Body.Close()
+	defer closeResponseBody(t, resp)
 
 	if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
 		t.Fatalf("Ошибка декодирования JSON: %v", err)
+	}
+}
+
+func closeResponseBody(t *testing.T, resp *http.Response) {
+	t.Helper()
+	if err := resp.Body.Close(); err != nil {
+		t.Logf("Ошибка закрытия response body: %v", err)
 	}
 }
 

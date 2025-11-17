@@ -127,7 +127,7 @@ func mapCreatePRError(err error) (int, string, string) {
 	case errors.Is(err, domain.ErrNoReviewerCandidates):
 		return http.StatusConflict, ErrCodeNoCandidate, "no active reviewer candidates in team"
 	default:
-		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, ErrMsgInternalError
 	}
 }
 
@@ -136,7 +136,7 @@ func mapMergePRError(err error) (int, string, string) {
 	case errors.Is(err, domain.ErrPullRequestNotFound):
 		return http.StatusNotFound, ErrCodeNotFound, "pull request not found"
 	default:
-		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, ErrMsgInternalError
 	}
 }
 
@@ -155,6 +155,6 @@ func mapReassignPRError(err error) (int, string, string) {
 	case errors.Is(err, domain.ErrReviewerInactive):
 		return http.StatusConflict, ErrCodeNoCandidate, "reviewer inactive"
 	default:
-		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, ErrMsgInternalError
 	}
 }

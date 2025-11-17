@@ -11,3 +11,8 @@ const (
 	ErrCodeNotAssigned  = "NOT_ASSIGNED"
 )
 
+// Сообщения об ошибках
+const (
+	ErrMsgInternalError = "internal error"
+)
+

@@ -27,7 +27,7 @@ func (h *StatsHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	stats, err := h.getStatsUseCase.GetStats(r.Context())
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "ошибка получения статистики", "error", err)
-		respondError(h.logger, w, http.StatusInternalServerError, "INTERNAL", "internal error")
+		respondError(h.logger, w, http.StatusInternalServerError, ErrCodeInternal, ErrMsgInternalError)
 		return
 	}
 

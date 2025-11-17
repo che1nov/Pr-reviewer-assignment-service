@@ -96,6 +96,6 @@ func mapTeamError(err error) (int, string, string) {
 	case errors.Is(err, domain.ErrTeamExists):
 		return http.StatusBadRequest, ErrCodeTeamExists, "team_name already exists"
 	default:
-		return http.StatusInternalServerError, ErrCodeInternal, "internal error"
+		return http.StatusInternalServerError, ErrCodeInternal, ErrMsgInternalError
 	}
 }

@@ -114,6 +114,7 @@ issues:
         - goconst
         - gocyclo
         - gocognit
+        - bodyclose
     
     # Исключаем проверки для main.go (точка входа)
     - path: cmd/api/main\.go
